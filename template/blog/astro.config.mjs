@@ -1,12 +1,13 @@
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightBlog from "starlight-blog";
+import { SITE_URL } from "./src/lib/site.mjs";
 
 import tailwind from "@astrojs/tailwind";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://your-site.com",
+  site: SITE_URL,
   trailingSlash: "always",
   integrations: [
     starlight({

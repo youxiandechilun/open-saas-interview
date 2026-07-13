@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "../client/components/ui/card";
 import { cn } from "../client/utils";
+import { PageSeo } from "../seo/PageSeo";
 import {
   PaymentPlanId,
   paymentPlans,
@@ -119,6 +120,25 @@ export function PricingPage() {
 
   return (
     <div className="py-10 lg:mt-10">
+      <PageSeo
+        title="Pricing | Your Open SaaS App"
+        description="Compare flexible subscription and credit plans for Your Open SaaS App."
+        pathname="/pricing"
+        type="product"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "OfferCatalog",
+          name: "Your Open SaaS App plans",
+          url: "https://your-saas-app.com/pricing",
+          itemListElement: Object.values(PaymentPlanId).map((planId) => ({
+            "@type": "Offer",
+            name: paymentPlanCards[planId].name,
+            priceCurrency: "USD",
+            price: paymentPlanCards[planId].price.replace("$", ""),
+            description: paymentPlanCards[planId].description,
+          })),
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div id="pricing" className="mx-auto max-w-4xl text-center">
           <h2 className="text-foreground mt-2 text-4xl font-bold tracking-tight sm:text-5xl">

@@ -7,9 +7,11 @@ import { LandingPage } from "./src/landing-page/LandingPage" with { type: "ref" 
 import { seedMockUsers } from "./src/server/scripts/dbSeeds" with { type: "ref" };
 
 import { adminSpec } from "./src/admin/admin.wasp";
+import { aiStudioSpec } from "./src/ai-studio/ai-studio.wasp";
 import { analyticsSpec } from "./src/analytics/analytics.wasp";
 import { authConfig, authSpec } from "./src/auth/auth.wasp";
 import { head } from "./src/client/head.wasp";
+import { contentCmsSpec } from "./src/content-cms/content-cms.wasp";
 import { demoAiAppSpec } from "./src/demo-ai-app/demo-ai-app.wasp";
 import { fileUploadSpec } from "./src/file-upload/file-upload.wasp";
 import { paymentSpec } from "./src/payment/payment.wasp";
@@ -48,5 +50,7 @@ export default app({
     fileUploadSpec,
     analyticsSpec,
     adminSpec,
+    contentCmsSpec,
+    aiStudioSpec,
   ],
 });

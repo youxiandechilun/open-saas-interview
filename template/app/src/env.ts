@@ -1,8 +1,10 @@
 import { defineEnvValidationSchema } from "wasp/env";
 
 import * as z from "zod";
+import { aiStudioEnvSchema } from "./ai-studio/env";
 import { googleAnalyticsEnvSchema, plausibleEnvSchema } from "./analytics/env";
 import { authEnvSchema } from "./auth/env";
+import { contentCmsEnvSchema } from "./content-cms/env";
 import { demoAiAppEnvSchema } from "./demo-ai-app/env";
 import { fileUploadEnvSchema } from "./file-upload/env";
 import { lemonSqueezyEnvSchema } from "./payment/lemonSqueezy/env";
@@ -19,10 +21,12 @@ import { stripeEnvSchema } from "./payment/stripe/env";
 export const serverEnvValidationSchema = defineEnvValidationSchema(
   z.object({
     ...authEnvSchema.shape,
+    ...aiStudioEnvSchema.shape,
     ...stripeEnvSchema.shape,
     ...lemonSqueezyEnvSchema.shape,
     ...polarEnvSchema.shape,
     ...demoAiAppEnvSchema.shape,
+    ...contentCmsEnvSchema.shape,
     ...fileUploadEnvSchema.shape,
     ...plausibleEnvSchema.shape,
     ...googleAnalyticsEnvSchema.shape,

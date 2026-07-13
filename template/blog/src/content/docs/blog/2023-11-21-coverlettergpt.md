@@ -1,5 +1,6 @@
 ---
 title: How I Built & Grew CoverLetterGPT to 5,000 Users and $200 MRR
+description: Learn how CoverLetterGPT reached 5,000 users and $200 MRR through an open-source SaaS stack, practical distribution, and simple pricing.
 date: 2023-11-21
 tags: ["indiehacker", "saas", "sideproject"] 
 subtitle: A guide to building a profitable, open-source side-project
@@ -14,6 +15,8 @@ authors:
 ![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/az8xf61b2qxx1msfo4t5.png)
 
 I’m a self-taught developer that changed careers during the Covid Pandemic. I did it because I wanted a better career, enjoyed programming, and at the same time, had a keen interest in IndieHacking.
+For a shorter introduction, start with the [Open SaaS example guide](/guides/example/).
+
 <!--truncate-->
 If you’re not aware, IndieHacking is the movement of developers who build potentially profitable side-projects in their spare time. And there are some very successful examples of IndieHackers and “solopreneurs” out there inspiring others, such as [levels.io](http://levels.io) and [Marc Lou](https://twitter.com/marc_louvion). 
 

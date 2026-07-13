@@ -2,3 +2,11 @@ User-agent: *
 Allow: /
 Disallow: /account
 Disallow: /admin
+Disallow: /ai-studio
+Disallow: /checkout
+Disallow: /demo-app
+Disallow: /file-upload
+Disallow: /login
+Disallow: /signup
+
+Sitemap: https://your-saas-app.com/sitemap.xml

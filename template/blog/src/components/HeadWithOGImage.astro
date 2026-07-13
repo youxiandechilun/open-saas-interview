@@ -2,8 +2,10 @@
 import type { Props } from '@astrojs/starlight/props'
 import Default from '@astrojs/starlight/components/Head.astro'
 import { BANNER_PATH, DEFAULT_BANNER_IMAGE, getBannerImageFilename, checkBannerImageExists } from './imagePaths'
+import { createBlogStructuredData, serializeJsonLd } from '../lib/blogSeo.mjs'
 
-const bannerImageFileName = getBannerImageFilename({ path: Astro.props.id })
+const { entry, id, lastUpdated, siteTitle } = Astro.props
+const bannerImageFileName = getBannerImageFilename({ path: id })
 const imageExists = checkBannerImageExists({ bannerImageFileName })
 
 // Get the URL of the social media preview image for the current post using its
@@ -18,12 +20,55 @@ if (imageExists) {
     Astro.site,
   )
 }
+
+const { data } = entry
+const publishedAt = data.date instanceof Date ? data.date : undefined
+const isPublishedBlogPost = id.startsWith('blog/') && publishedAt !== undefined && data.draft !== true
+const description = data.description || data.subtitle || ''
+const canonicalUrl = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined
+const modifiedAt = data.lastUpdated instanceof Date ? data.lastUpdated : lastUpdated
+const rawAuthors = data.authors ? (Array.isArray(data.authors) ? data.authors : [data.authors]) : []
+const authors = rawAuthors.map((author) => typeof author === 'string' ? author : author.name)
+const tags = data.tags ?? []
+
+const structuredData = isPublishedBlogPost && canonicalUrl && description && Astro.site
+  ? createBlogStructuredData({
+      canonicalUrl,
+      blogUrl: new URL('/blog/', Astro.site).href,
+      homeUrl: new URL('/', Astro.site).href,
+      title: data.title,
+      description,
+      imageUrl: ogImageUrl.href,
+      publishedAt: publishedAt.toISOString(),
+      modifiedAt: modifiedAt?.toISOString(),
+      authors,
+      tags,
+      siteTitle,
+    })
+  : undefined
 ---
 
 <Default {...Astro.props}><slot /></Default>
 
 <!-- Open Graph images. -->
-<meta property="og:image" content={ogImageUrl} />
+<meta property="og:image" content={ogImageUrl.href} />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta name="twitter:image" content={ogImageUrl} />
+<meta property="og:image:alt" content={data.title} />
+<meta name="twitter:image" content={ogImageUrl.href} />
+<meta name="twitter:image:alt" content={data.title} />
+
+{isPublishedBlogPost && (
+  <>
+    <meta property="article:published_time" content={publishedAt.toISOString()} />
+    {modifiedAt && <meta property="article:modified_time" content={modifiedAt.toISOString()} />}
+    {tags.map((tag) => <meta property="article:tag" content={tag} />)}
+    {authors.map((author) => <meta property="article:author" content={author} />)}
+    <meta name="twitter:title" content={data.title} />
+    {description && <meta name="twitter:description" content={description} />}
+  </>
+)}
+
+{structuredData && (
+  <script is:inline type="application/ld+json" set:html={serializeJsonLd(structuredData)} />
+)}

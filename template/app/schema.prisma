@@ -26,6 +26,10 @@ model User {
   contactFormMessages       ContactFormMessage[]
   tasks                     Task[]
   files                     File[]
+  cmsPosts                  CmsPost[]
+  aiAnimations              AiAnimation[]
+  aiUsageLogs               AiUsageLog[]
+  aiQuotaWindows            AiQuotaWindow[]
 }
 
 model GptResponse {
@@ -108,4 +112,175 @@ model ContactFormMessage {
   content                   String
   isRead                    Boolean         @default(false)
   repliedAt                 DateTime?
+}
+
+enum CmsPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model CmsAuthor {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name String
+  slug String  @unique
+  bio  String?
+
+  posts CmsPost[]
+
+  @@index([name])
+}
+
+model CmsTag {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name String
+  slug String @unique
+
+  posts CmsPost[]
+
+  @@index([name])
+}
+
+model CmsPost {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  slug        String        @unique
+  excerpt     String
+  content     String
+  status      CmsPostStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdById String
+  author      CmsAuthor @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  authorId    String
+  tags        CmsTag[]
+
+  @@index([status, publishedAt])
+  @@index([authorId, status])
+  @@index([createdById, updatedAt])
+}
+
+model CmsPublicationEvent {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  postId         String
+  eventType      String
+  contentVersion String
+  payload        Json
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now())
+  lastError      String?
+  processedAt    DateTime?
+
+  @@index([postId, createdAt])
+  @@index([status, availableAt, createdAt])
+}
+
+enum AiAnimationStatus {
+  READY
+  FAILED
+}
+
+enum VideoStatus {
+  NOT_REQUESTED
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+model AiAnimation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  title           String
+  description     String?
+  originalPrompt  String
+  optimizedPrompt String
+  promptScore     Int
+  promptFeedback  Json
+  html            String
+  durationSeconds Int               @default(5)
+  status          AiAnimationStatus @default(READY)
+  generationError String?
+
+  videoStatus      VideoStatus @default(NOT_REQUESTED)
+  videoFormat      String?
+  videoStoragePath String?
+  videoMimeType    String?
+  videoError       String?
+  videoAttempts    Int         @default(0)
+  videoJobId       String?
+  videoUsageLogId  String?
+  videoUpdatedAt   DateTime?
+  videoLeaseExpiresAt DateTime?
+
+  usageLogs AiUsageLog[]
+
+  @@index([userId, createdAt])
+  @@index([userId, videoStatus])
+}
+
+model AiUsageLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  animation   AiAnimation? @relation(fields: [animationId], references: [id], onDelete: SetNull)
+  animationId String?
+
+  operation           String
+  idempotencyKey      String
+  status              String
+  promptTokens        Int     @default(0)
+  completionTokens    Int     @default(0)
+  totalTokens         Int     @default(0)
+  estimatedCostMicros Int     @default(0)
+  latencyMs           Int?
+  errorCode           String?
+  responseJson        Json?
+  reservedTokens      Int             @default(0)
+  quotaWindowStart    DateTime?
+  expiresAt           DateTime?
+
+  @@unique([userId, operation, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([userId, status, expiresAt])
+}
+
+model AiQuotaWindow {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  operation    String
+  windowStart  DateTime
+  requestCount Int      @default(0)
+  inFlight     Int      @default(0)
+  tokenCount   Int      @default(0)
+
+  @@unique([userId, operation, windowStart])
+  @@index([userId, windowStart])
 }

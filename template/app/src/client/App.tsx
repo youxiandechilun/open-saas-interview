@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Outlet, useLocation } from "react-router";
 import { routes } from "wasp/client/router";
 import { Toaster } from "../client/components/ui/toaster";
+import { PrivatePageSeo } from "../seo/PrivatePageSeo";
 import "./Main.css";
 import { NavBar } from "./components/NavBar/NavBar";
 import {
@@ -51,6 +52,7 @@ export function App() {
   return (
     <>
       <div className="bg-background text-foreground min-h-screen">
+        {!isMarketingPage && <PrivatePageSeo pathname={location.pathname} />}
         {isAdminDashboard ? (
           <Outlet />
         ) : (

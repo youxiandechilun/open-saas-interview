@@ -4,10 +4,17 @@
   "type": "module",
   "scripts": {
     "astro": "astro",
-    "build": "astro check && astro build",
+    "prebuild": "npm run cms:sync && npm run seo:publish",
+    "build": "astro check && astro build && node scripts/assert-build.mjs",
+    "cms:sync": "node scripts/cms-sync.mjs",
+    "content:publish": "node scripts/production-config.mjs && npm run build",
     "dev": "astro dev",
     "preview": "astro preview",
-    "start": "astro dev"
+    "seo:check": "node scripts/seo-pipeline.mjs",
+    "seo:publish": "node scripts/seo-pipeline.mjs --write",
+    "start": "astro dev",
+    "test": "node --test test/blog-seo.test.mjs test/seo-quality.test.mjs test/cms-sync.test.mjs test/production-config.test.mjs",
+    "test:build": "node scripts/assert-build.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",

@@ -1,3 +1,4 @@
+import { PageSeo } from "../seo/PageSeo";
 import { ExamplesCarousel } from "./components/ExamplesCarousel";
 import { FAQ } from "./components/FAQ";
 import { FeaturesGrid } from "./components/FeaturesGrid";
@@ -14,9 +15,17 @@ import {
 } from "./contentSections";
 import { AIReady } from "./ExampleHighlightedFeature";
 
+const landingDescription =
+  "Launch a production-ready SaaS with authentication, payments, an admin dashboard, AI features, and a high-performance blog.";
+
 export function LandingPage() {
   return (
     <div className="bg-background text-foreground">
+      <PageSeo
+        title="Your Open SaaS App"
+        description={landingDescription}
+        pathname="/"
+      />
       <SchemaMarkup />
       <main className="isolate">
         <Hero />
