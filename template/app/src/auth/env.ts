@@ -7,7 +7,7 @@ export const authEnvSchema = z.object({
     .transform((val) =>
       val
         .split(",")
-        .map((email) => email.trim())
+        .map((email) => email.trim().toLowerCase())
         .filter(Boolean),
     ),
 });

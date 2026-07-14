@@ -29,6 +29,12 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: /mobileWorkflow\.spec\.ts/,
+    },
+    {
+      name: "mobile-chromium",
+      use: { ...devices["Pixel 7"] },
+      testMatch: /mobileWorkflow\.spec\.ts/,
     },
   ],
 

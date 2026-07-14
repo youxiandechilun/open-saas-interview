@@ -16,6 +16,12 @@ const BLOG_ROOT = fileURLToPath(
 );
 export const GENERATED_CONTENT_DIR = path.join(BLOG_ROOT, "cms-generated");
 const SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SAFE_PUBLIC_MEDIA_PATH =
+  /^\/content-cms\/media\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const VIDEO_MIME_BY_FORMAT = {
+  mp4: "video/mp4",
+  webm: "video/webm",
+};
 
 /** @param {unknown} value @param {string} field */
 function requireString(value, field) {
@@ -34,13 +40,83 @@ function requireDate(value, field) {
   return parsed.toISOString();
 }
 
+function normalizePublishedAnimation(animation, mediaBaseUrl) {
+  if (animation == null) return null;
+  if (typeof animation !== "object" || Array.isArray(animation)) {
+    throw new Error("CMS post has an invalid animation.");
+  }
+
+  const id = requireString(animation.id, "animation id");
+  const title = requireString(animation.title, "animation title");
+  const description =
+    typeof animation.description === "string" && animation.description.trim()
+      ? animation.description.trim()
+      : null;
+  const status = requireString(animation.status, "animation status");
+  const videoStatus = requireString(
+    animation.videoStatus,
+    "animation video status",
+  );
+  const publicMediaPath = animation.publicMediaPath;
+  if (publicMediaPath == null) {
+    return {
+      id,
+      title,
+      description,
+      status,
+      videoStatus,
+      videoFormat: null,
+      videoMimeType: null,
+      publicMediaPath: null,
+      publicMediaUrl: null,
+    };
+  }
+
+  const mediaPath = requireString(publicMediaPath, "animation media path");
+  const format = requireString(animation.videoFormat, "animation video format");
+  const mimeType = requireString(
+    animation.videoMimeType,
+    "animation video MIME type",
+  );
+  if (
+    status !== "READY" ||
+    videoStatus !== "SUCCEEDED" ||
+    !SAFE_PUBLIC_MEDIA_PATH.test(mediaPath) ||
+    VIDEO_MIME_BY_FORMAT[format] !== mimeType
+  ) {
+    throw new Error(`CMS animation '${id}' has unsafe public media metadata.`);
+  }
+
+  let publicMediaUrl = mediaPath;
+  if (mediaBaseUrl) {
+    const base = new globalThis.URL(mediaBaseUrl);
+    if (!/^https?:$/.test(base.protocol)) {
+      throw new Error("CMS media base URL must use HTTP(S).");
+    }
+    publicMediaUrl = new globalThis.URL(mediaPath, base.origin).href;
+  }
+
+  return {
+    id,
+    title,
+    description,
+    status,
+    videoStatus,
+    videoFormat: format,
+    videoMimeType: mimeType,
+    publicMediaPath: mediaPath,
+    publicMediaUrl,
+  };
+}
+
 /**
  * Validate the public feed at the Astro boundary rather than trusting a remote
  * payload to become source files.
  *
  * @param {unknown} payload
+ * @param {{mediaBaseUrl?: string}} [options]
  */
-export function normalizePublishedFeed(payload) {
+export function normalizePublishedFeed(payload, options = {}) {
   if (
     !payload ||
     typeof payload !== "object" ||
@@ -84,6 +160,10 @@ export function normalizePublishedFeed(payload) {
         updatedAt: requireDate(post.updatedAt ?? post.publishedAt, "updatedAt"),
         author: { name: authorName },
         tags,
+        animation: normalizePublishedAnimation(
+          post.animation,
+          options.mediaBaseUrl,
+        ),
         canonicalPath,
       };
     });
@@ -126,9 +206,37 @@ export function renderCmsPost(post) {
     `tags: ${JSON.stringify(post.tags)}`,
     "---",
     "",
+    ...renderCmsAnimation(post.animation),
     post.content,
     "",
   ].join("\n");
+}
+
+function renderCmsAnimation(animation) {
+  if (!animation?.publicMediaUrl) return [];
+  const title = escapeHtml(animation.title);
+  const description = animation.description
+    ? `<br />${escapeHtml(animation.description)}`
+    : "";
+  return [
+    `<figure data-motionpress-animation-id="${escapeHtml(animation.id)}">`,
+    `  <video controls preload="metadata" playsinline aria-label="${title}">`,
+    `    <source src="${escapeHtml(animation.publicMediaUrl)}" type="${escapeHtml(animation.videoMimeType)}" />`,
+    "    Your browser does not support embedded video.",
+    "  </video>",
+    `  <figcaption><strong>${title}</strong>${description}</figcaption>`,
+    "</figure>",
+    "",
+  ];
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 async function pathExists(candidate) {
@@ -235,8 +343,15 @@ async function assertNoLocalRouteCollisions(posts, targetDir) {
 export async function syncCmsContent(options = {}) {
   const targetDir = options.targetDir ?? GENERATED_CONTENT_DIR;
   const url = options.url?.trim();
-  if (options.offline || !url) {
+  if (options.offline) {
+    // Offline builds must not inherit content from a previous online sync.
+    await replaceGeneratedContent({ targetDir, posts: [] });
     return { mode: "offline", imported: 0, contentVersion: null };
+  }
+  if (!url) {
+    throw new Error(
+      "CMS_CONTENT_API_URL is required unless CMS_CONTENT_OFFLINE=1 is explicit.",
+    );
   }
 
   const headers = { Accept: "application/json" };
@@ -251,7 +366,9 @@ export async function syncCmsContent(options = {}) {
     );
   }
 
-  const feed = normalizePublishedFeed(await response.json());
+  const feed = normalizePublishedFeed(await response.json(), {
+    mediaBaseUrl: new globalThis.URL(url).origin,
+  });
   await assertNoLocalRouteCollisions(feed.posts, targetDir);
   await replaceGeneratedContent({ targetDir, posts: feed.posts });
   return {
@@ -272,7 +389,7 @@ async function runCli() {
   });
   if (result.mode === "offline") {
     console.log(
-      "CMS sync: offline mode; local sample posts were left unchanged.",
+      "CMS sync: offline mode; generated CMS content was reset while checked-in posts were left unchanged.",
     );
   } else {
     console.log(

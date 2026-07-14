@@ -2,20 +2,23 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "wasp/server";
 import {
   AI_HOURLY_REQUEST_LIMIT,
-  AI_HOURLY_TOKEN_LIMIT,
   AI_MAX_CONCURRENT_REQUESTS,
   calculateEstimatedCostMicros,
   normalizeIdempotencyKey,
   startOfUtcHour,
 } from "../policy";
+import {
+  AI_PROVIDER_CONFIG_ID,
+  getAiProviderEnvironment,
+} from "./providerConfig";
+import { resolveAiProviderLimits } from "./providerResolution";
+import {
+  calculateTokenReservation,
+  calculateTokenSettlementDelta,
+  tokenCapacityThreshold,
+} from "./quotaPolicy";
 
 const SHARED_QUOTA_OPERATION = "AI_STUDIO";
-const TOKEN_RESERVATION_BY_OPERATION: Record<string, number> = {
-  PROMPT_OPTIMIZE: 6_000,
-  HTML_GENERATE: 18_000,
-  VIDEO_RENDER: 0,
-  VIDEO_RETRY: 0,
-};
 
 type ExistingUsage = {
   id: string;
@@ -31,6 +34,8 @@ export type Reservation =
       usageLogId: string;
       windowStart: Date;
       reservedTokens: number;
+      maxCompletionTokens: number;
+      hourlyTokenLimit: number;
     }
   | { kind: "existing"; usage: ExistingUsage }
   | {
@@ -43,6 +48,9 @@ export async function reserveUsage(
     userId: string;
     operation: string;
     idempotencyKey: string;
+    estimatedPromptTokens?: number;
+    requestedCompletionTokens?: number;
+    reservationTtlMs?: number;
     now?: Date;
   },
   attempt = 0,
@@ -50,7 +58,6 @@ export async function reserveUsage(
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
   const now = input.now ?? new Date();
   const windowStart = startOfUtcHour(now);
-  const reservedTokens = TOKEN_RESERVATION_BY_OPERATION[input.operation] ?? 0;
 
   try {
     return await prisma.$transaction(
@@ -79,11 +86,11 @@ export async function reserveUsage(
             },
           });
           if (expired.count > 0 && stale.quotaWindowStart) {
-            await releaseWindow(
+            await settleQuotaWindow(
               tx,
               input.userId,
               stale.quotaWindowStart,
-              stale.reservedTokens,
+              -stale.reservedTokens,
             );
           }
         }
@@ -105,6 +112,24 @@ export async function reserveUsage(
           },
         });
         if (existing) return { kind: "existing", usage: existing };
+
+        const storedLimits = await tx.aiProviderConfig.findUnique({
+          where: { id: AI_PROVIDER_CONFIG_ID },
+          select: {
+            hourlyTokenLimit: true,
+            maxCompletionTokens: true,
+          },
+        });
+        const limits = resolveAiProviderLimits({
+          stored: storedLimits,
+          environment: getAiProviderEnvironment(),
+        });
+        const plan = calculateTokenReservation({
+          estimatedPromptTokens: input.estimatedPromptTokens ?? 0,
+          requestedCompletionTokens: input.requestedCompletionTokens ?? 0,
+          configuredMaxCompletionTokens: limits.maxCompletionTokens,
+        });
+        const reservedTokens = plan.reservedTokens;
 
         const window = await tx.aiQuotaWindow.upsert({
           where: {
@@ -128,13 +153,21 @@ export async function reserveUsage(
           },
         });
 
+        const tokenThreshold = tokenCapacityThreshold(
+          limits.hourlyTokenLimit,
+          reservedTokens,
+        );
+        if (tokenThreshold === null) {
+          return { kind: "denied", reason: "TOKEN_LIMIT" };
+        }
+
         const capacity = await tx.aiQuotaWindow.updateMany({
           where: {
             id: window.id,
             requestCount: { lt: AI_HOURLY_REQUEST_LIMIT },
             inFlight: { lt: AI_MAX_CONCURRENT_REQUESTS },
             tokenCount: {
-              lte: Math.max(0, AI_HOURLY_TOKEN_LIMIT - reservedTokens),
+              lte: tokenThreshold,
             },
           },
           data: {
@@ -162,7 +195,9 @@ export async function reserveUsage(
             status: "STARTED",
             reservedTokens,
             quotaWindowStart: windowStart,
-            expiresAt: new Date(now.getTime() + 5 * 60_000),
+            expiresAt: new Date(
+              now.getTime() + (input.reservationTtlMs ?? 5 * 60_000),
+            ),
           },
           select: { id: true },
         });
@@ -172,6 +207,8 @@ export async function reserveUsage(
           usageLogId: usage.id,
           windowStart,
           reservedTokens,
+          maxCompletionTokens: plan.maxCompletionTokens,
+          hourlyTokenLimit: limits.hourlyTokenLimit,
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -198,7 +235,7 @@ export async function reserveUsage(
         },
       });
       if (existing) return { kind: "existing", usage: existing };
-      if (error.code === "P2034" && attempt < 2) {
+      if (attempt < 2) {
         return reserveUsage(input, attempt + 1);
       }
     }
@@ -240,11 +277,15 @@ export async function completeUsage(input: {
       },
     });
     if (changed.count > 0) {
-      await releaseWindow(
+      await settleQuotaWindow(
         tx,
         input.userId,
         input.windowStart,
-        Math.max(0, input.reservedTokens - totalTokens),
+        calculateTokenSettlementDelta({
+          reservedTokens: input.reservedTokens,
+          promptTokens,
+          completionTokens,
+        }),
       );
     }
   });
@@ -258,34 +299,105 @@ export async function failUsage(input: {
   latencyMs?: number;
   animationId?: string;
   reservedTokens: number;
+  promptTokens?: number;
+  completionTokens?: number;
 }): Promise<void> {
+  const promptTokens = Math.max(0, Math.floor(input.promptTokens ?? 0));
+  const completionTokens = Math.max(0, Math.floor(input.completionTokens ?? 0));
+  const totalTokens = promptTokens + completionTokens;
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const changed = await tx.aiUsageLog.updateMany({
       where: { id: input.usageLogId, status: "STARTED" },
       data: {
         status: "FAILED",
         errorCode: input.errorCode,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCostMicros: calculateEstimatedCostMicros({
+          promptTokens,
+          completionTokens,
+        }),
         latencyMs: input.latencyMs,
         animationId: input.animationId,
         expiresAt: null,
       },
     });
     if (changed.count > 0) {
-      await releaseWindow(
+      await settleQuotaWindow(
         tx,
         input.userId,
         input.windowStart,
-        input.reservedTokens,
+        calculateTokenSettlementDelta({
+          reservedTokens: input.reservedTokens,
+          promptTokens,
+          completionTokens,
+        }),
       );
     }
   });
 }
 
-async function releaseWindow(
+export async function expireVideoLease(input: {
+  animationId: string;
+  userId: string;
+  usageLogId: string | null;
+  now: Date;
+}): Promise<boolean> {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const animationChanged = await tx.aiAnimation.updateMany({
+      where: {
+        id: input.animationId,
+        userId: input.userId,
+        videoStatus: "PROCESSING",
+        videoUsageLogId: input.usageLogId,
+        videoLeaseExpiresAt: { lte: input.now },
+      },
+      data: {
+        videoStatus: "FAILED",
+        videoError: "Video worker lease expired; retry is available.",
+        videoUpdatedAt: input.now,
+        videoLeaseExpiresAt: null,
+      },
+    });
+    if (animationChanged.count === 0 || !input.usageLogId) return false;
+
+    const usage = await tx.aiUsageLog.findUnique({
+      where: { id: input.usageLogId },
+      select: {
+        status: true,
+        quotaWindowStart: true,
+        reservedTokens: true,
+      },
+    });
+    if (!usage || usage.status !== "STARTED") return true;
+
+    const usageChanged = await tx.aiUsageLog.updateMany({
+      where: { id: input.usageLogId, status: "STARTED" },
+      data: {
+        status: "FAILED",
+        errorCode: "VIDEO_LEASE_EXPIRED",
+        animationId: input.animationId,
+        expiresAt: null,
+      },
+    });
+    if (usageChanged.count > 0 && usage.quotaWindowStart) {
+      await settleQuotaWindow(
+        tx,
+        input.userId,
+        usage.quotaWindowStart,
+        -usage.reservedTokens,
+      );
+    }
+    return true;
+  });
+}
+
+async function settleQuotaWindow(
   tx: Prisma.TransactionClient,
   userId: string,
   windowStart: Date,
-  tokenRefund: number,
+  tokenDelta: number,
 ): Promise<void> {
   await tx.aiQuotaWindow.updateMany({
     where: {
@@ -296,7 +408,10 @@ async function releaseWindow(
     },
     data: {
       inFlight: { decrement: 1 },
-      tokenCount: { decrement: tokenRefund },
+      tokenCount:
+        tokenDelta >= 0
+          ? { increment: tokenDelta }
+          : { decrement: Math.abs(tokenDelta) },
     },
   });
 }

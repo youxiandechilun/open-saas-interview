@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MotionPress social image</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; margin: 0; overflow: hidden; }
+      body {
+        display: grid;
+        grid-template-columns: 43% 57%;
+        background: #e8f0f6;
+        color: #17212b;
+        font-family: Inter, Arial, sans-serif;
+        letter-spacing: 0;
+      }
+      .copy { display: flex; flex-direction: column; justify-content: center; padding: 72px 42px 72px 72px; }
+      .brand { display: flex; align-items: center; gap: 14px; font-size: 24px; font-weight: 800; }
+      .mark { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 7px; background: #0b5cad; color: white; }
+      h1 { max-width: 440px; margin: 40px 0 18px; font-size: 52px; line-height: 1.08; }
+      .lead { max-width: 420px; margin: 0; color: #526273; font-size: 21px; line-height: 1.45; }
+      .flow { margin-top: 38px; color: #0b5cad; font-size: 15px; font-weight: 750; }
+      .workspace { display: flex; align-items: center; padding: 54px 58px 54px 10px; }
+      .window { width: 100%; height: 510px; overflow: hidden; border: 1px solid #bdc9d4; border-radius: 8px; background: #fff; }
+      .bar { display: flex; height: 52px; align-items: center; gap: 8px; border-bottom: 1px solid #d0d8e0; padding: 0 18px; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: #d0d8e0; }
+      .bar-title { margin-left: 10px; font-size: 13px; font-weight: 700; }
+      .body { display: grid; height: 458px; grid-template-columns: 205px 1fr; }
+      .sidebar { border-right: 1px solid #d0d8e0; background: #f6f8fa; padding: 24px 18px; }
+      .nav { margin-bottom: 10px; padding: 10px 12px; border-radius: 6px; color: #526273; font-size: 13px; }
+      .nav.active { background: #dceaf7; color: #0b5cad; font-weight: 750; }
+      .main { padding: 25px; }
+      .eyebrow { color: #d96b2b; font-size: 12px; font-weight: 800; }
+      .title { margin-top: 5px; font-size: 23px; font-weight: 800; }
+      .steps { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 20px; border-block: 1px solid #d0d8e0; }
+      .step { min-height: 74px; border-right: 1px solid #d0d8e0; padding: 12px 10px; font-size: 11px; }
+      .step:last-child { border-right: 0; }
+      .num { color: #0b5cad; font-weight: 800; }
+      .stage { position: relative; height: 205px; margin-top: 20px; overflow: hidden; border: 1px solid #d0d8e0; background: #e8f0f6; }
+      .motion-word { position: absolute; right: 25px; top: 24px; font-size: 58px; font-weight: 900; }
+      .motion-label { position: absolute; left: 26px; top: 76px; background: #0b5cad; color: white; padding: 10px 14px; font-size: 13px; font-weight: 800; }
+      .motion-block { position: absolute; right: 84px; bottom: 22px; width: 62px; height: 62px; background: #d96b2b; transform: rotate(12deg); }
+      .timeline { position: absolute; left: 26px; right: 26px; bottom: 28px; height: 7px; background: #c6d0d9; }
+      .timeline::after { display: block; width: 64%; height: 100%; background: #0b5cad; content: ""; }
+      .statuses { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+      .status { border-left: 3px solid #168253; background: #f6f8fa; padding: 9px 10px; font-size: 10px; }
+      .status strong { display: block; margin-bottom: 3px; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <section class="copy">
+      <div class="brand"><span class="mark">M</span>MotionPress</div>
+      <h1>AI animation to SEO publishing</h1>
+      <p class="lead">Create, render, review, and publish from one governed content workspace.</p>
+      <p class="flow">PROMPT → HTML → VIDEO → ARTICLE → SEARCH</p>
+    </section>
+    <section class="workspace">
+      <div class="window">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bar-title">Animation Studio</span></div>
+        <div class="body">
+          <aside class="sidebar">
+            <div class="nav">Overview</div>
+            <div class="nav active">Animation Studio</div>
+            <div class="nav">Articles & Publishing</div>
+            <div class="nav">Task Center</div>
+          </aside>
+          <main class="main">
+            <div class="eyebrow">ONE ACCOUNTABLE WORKFLOW</div>
+            <div class="title">Campaign motion asset</div>
+            <div class="steps">
+              <div class="step"><span class="num">01</span><br />Optimize</div>
+              <div class="step"><span class="num">02</span><br />Generate</div>
+              <div class="step"><span class="num">03</span><br />Render</div>
+              <div class="step"><span class="num">04</span><br />Publish</div>
+            </div>
+            <div class="stage">
+              <div class="motion-word">MOVE</div>
+              <div class="motion-label">PROMPT → MOTION</div>
+              <div class="motion-block"></div>
+              <div class="timeline"></div>
+            </div>
+            <div class="statuses">
+              <div class="status"><strong>Prompt 91</strong>Ready</div>
+              <div class="status"><strong>MP4</strong>Rendered</div>
+              <div class="status"><strong>SEO 94</strong>Passed</div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

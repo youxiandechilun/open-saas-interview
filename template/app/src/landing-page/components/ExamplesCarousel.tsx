@@ -1,5 +1,6 @@
 import { Ref, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "../../client/components/ui/card";
+import { useI18n } from "../../i18n";
 
 const EXAMPLES_CAROUSEL_INTERVAL = 3000;
 const EXAMPLES_CAROUSEL_SCROLL_TIMEOUT = 200;
@@ -12,6 +13,7 @@ interface ExampleApp {
 }
 
 export function ExamplesCarousel({ examples }: { examples: ExampleApp[] }) {
+  const { t } = useI18n();
   const [currentExample, setCurrentExample] = useState(0);
   const [isInView, setIsInView] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,10 +108,10 @@ export function ExamplesCarousel({ examples }: { examples: ExampleApp[] }) {
   return (
     <div
       ref={containerRef}
-      className="relative left-1/2 my-16 flex w-screen -translate-x-1/2 flex-col items-center"
+      className="my-16 flex w-full flex-col items-center overflow-hidden"
     >
       <h2 className="text-muted-foreground mb-6 text-center font-semibold tracking-wide">
-        Used by:
+        {t("landing.examples.heading")}
       </h2>
       <div className="w-full max-w-full overflow-hidden">
         <div

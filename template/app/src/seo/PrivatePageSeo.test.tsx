@@ -9,7 +9,7 @@ describe("PrivatePageSeo", () => {
     );
 
     expect(markup).toContain(
-      '<link rel="canonical" href="https://your-saas-app.com/admin/content"/>',
+      '<link rel="canonical" href="http://localhost:3000/admin/content"/>',
     );
     expect(markup).toContain(
       '<meta name="robots" content="noindex, nofollow, noarchive"/>',

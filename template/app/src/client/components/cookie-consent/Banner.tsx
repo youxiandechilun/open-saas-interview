@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import * as CookieConsent from "vanilla-cookieconsent";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
+import { useI18n } from "../../../i18n";
 import { getConfig } from "./Config";
 
 /**
@@ -9,9 +10,21 @@ import { getConfig } from "./Config";
  * as well as its import in src/client/App.tsx .
  */
 export function CookieConsentBanner() {
+  const { locale } = useI18n();
+
   useEffect(() => {
-    CookieConsent.run(getConfig());
-  }, []);
+    let cancelled = false;
+
+    const syncLanguage = async () => {
+      await CookieConsent.run(getConfig(locale));
+      if (!cancelled) await CookieConsent.setLanguage(locale, true);
+    };
+
+    void syncLanguage().catch((error: unknown) => console.error(error));
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   return <div id="cookieconsent"></div>;
 }

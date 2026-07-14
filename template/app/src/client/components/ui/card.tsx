@@ -4,15 +4,15 @@ import * as React from "react";
 import { cn } from "../../utils";
 
 const cardVariants = cva(
-  "rounded-xl border shadow hover:shadow-lg transition-all duration-300",
+  "rounded-lg border",
   {
     variants: {
       variant: {
         default: "bg-card text-card-foreground",
-        accent: "bg-card-accent text-card-accent-foreground hover:scale-[1.02]",
-        faded: "text-card-faded-foreground scale-95 opacity-50",
+        accent: "bg-card-accent text-card-accent-foreground",
+        faded: "text-muted-foreground opacity-60",
         bento:
-          "bg-card-subtle text-card-subtle-foreground hover:scale-[1.02] border-none shadow-none",
+          "bg-card-subtle text-card-subtle-foreground border-border",
       },
     },
   },

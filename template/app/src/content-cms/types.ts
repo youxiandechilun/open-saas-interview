@@ -2,6 +2,35 @@ export const CMS_POST_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
 
 export type CmsPostStatusValue = (typeof CMS_POST_STATUSES)[number];
 
+export type CmsPublicationEventSummary = {
+  id: string;
+  eventType: string;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  processedAt: Date | null;
+};
+
+export type CmsPublicationTaskStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "FAILED"
+  | "DISABLED";
+
+export type CmsPublicationTaskSummary = {
+  eventId: string;
+  postId: string;
+  eventType: string;
+  slug: string | null;
+  status: CmsPublicationTaskStatus;
+  attempts: number;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type CmsAuthorSummary = {
   id: string;
   name: string;
@@ -15,6 +44,24 @@ export type CmsTagSummary = {
   name: string;
   slug: string;
   postCount: number;
+};
+
+export type CmsAnimationSummary = {
+  id: string;
+  title: string;
+  description: string | null;
+  ownerLabel: string | null;
+  status: "READY" | "FAILED";
+  videoStatus:
+    | "NOT_REQUESTED"
+    | "QUEUED"
+    | "PROCESSING"
+    | "SUCCEEDED"
+    | "FAILED";
+  videoFormat: string | null;
+  videoMimeType: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type CmsPostListItem = {
@@ -33,6 +80,8 @@ export type CmsPostListItem = {
   tags: Array<
     Pick<CmsTagSummary, "id" | "name" | "slug"> & { updatedAt: Date }
   >;
+  animation: CmsAnimationSummary | null;
+  latestPublicationEvent?: CmsPublicationEventSummary | null;
 };
 
 export type CmsPostPage = {
@@ -44,6 +93,7 @@ export type CmsPostPage = {
 export type CmsTaxonomy = {
   authors: CmsAuthorSummary[];
   tags: CmsTagSummary[];
+  animations: CmsAnimationSummary[];
 };
 
 export type CmsPostWriteInput = {
@@ -54,6 +104,7 @@ export type CmsPostWriteInput = {
   status: CmsPostStatusValue;
   authorId: string;
   tagIds: string[];
+  animationId: string | null;
 };
 
 export type CmsSeoIssueCode =
@@ -65,6 +116,8 @@ export type CmsSeoIssueCode =
   | "AUTHOR_MISSING"
   | "SLUG_INVALID"
   | "DUPLICATE_H1"
+  | "H2_MISSING"
+  | "INTERNAL_LINK_MISSING"
   | "IMAGE_ALT_MISSING";
 
 export type CmsSeoReadinessIssue = {
@@ -73,7 +126,12 @@ export type CmsSeoReadinessIssue = {
   message: string;
 };
 
-export type PublishedCmsPost = CmsPostListItem & {
+export type PublishedCmsAnimation = Omit<CmsAnimationSummary, "ownerLabel"> & {
+  publicMediaPath: string | null;
+};
+
+export type PublishedCmsPost = Omit<CmsPostListItem, "animation"> & {
+  animation: PublishedCmsAnimation | null;
   canonicalPath: string;
 };
 

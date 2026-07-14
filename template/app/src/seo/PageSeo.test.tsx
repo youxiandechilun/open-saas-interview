@@ -18,7 +18,7 @@ describe("PageSeo", () => {
     );
 
     expect(markup).toContain(
-      '<link rel="canonical" href="https://your-saas-app.com/pricing"/>',
+      '<link rel="canonical" href="http://localhost:3000/pricing"/>',
     );
     expect(markup).toContain('<meta name="robots" content="index, follow"/>');
     expect(markup).toContain('<meta property="og:type" content="product"/>');

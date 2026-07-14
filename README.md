@@ -1,136 +1,91 @@
-## Floatboat Open SaaS Interview Fork
+# MotionPress
 
-This repository is a Floatboat interview starter based on [wasp-lang/open-saas](https://github.com/wasp-lang/open-saas).
+MotionPress 是一个面向内容运营团队的 AI 动画与 SEO 发布工作台。它把 Prompt 优化、安全 HTML 动画生成、视频渲染、文章管理、SEO 质量门禁和发布任务连接成一条可观察的业务链路。
 
-It is intentionally kept as a clean public coding environment. Interview tasks, scoring rubrics, and interviewer notes are provided separately by the interview team.
+实施边界和验收标准见 [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)。产品与视觉约束见 `template/app/PRODUCT.md` 和 `template/app/DESIGN.md`。
 
----
+## 核心流程
 
-## Welcome to your new SaaS App! 🎉
-
-<div style="display: flex; gap: 16px; align-items: center;">
-  <a href="https://www.producthunt.com/products/open-saas?embed=true&utm_source=badge-top-post-topic-badge&utm_medium=badge&utm_source=badge-open&#0045;saas&#0045;2&#0045;0" target="_blank">
-    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-topic-badge.svg?post_id=1023519&theme=neutral&period=weekly&topic_id=237&t=1760520428563" alt="Open&#0032;SaaS&#0032;2&#0046;0 - Free&#0044;&#0032;open&#0045;source&#0032;SaaS&#0032;starter&#0032;kit&#0032;with&#0032;superpowers | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" />
-  </a>
-  <a href="https://www.producthunt.com/products/open-saas?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_source=badge-open&#0045;saas&#0045;2&#0045;0" target="_blank">
-    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=1023519&theme=neutral&period=daily&t=1760520428563" alt="Open&#0032;SaaS&#0032;2&#0046;0 - Free&#0044;&#0032;open&#0045;source&#0032;SaaS&#0032;starter&#0032;kit&#0032;with&#0032;superpowers | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" />
-  </a>
-</div>
-
-https://github.com/user-attachments/assets/3856276b-23e9-455e-a564-b5f26f4f0e98
-
-You've decided to build a SaaS app with the Open SaaS template. Great choice!
-
-This template is:
-
-1. fully open-source
-2. completely free to use and distribute
-3. comes with a ton of features out of the box!
-4. ready to work with your favorite AI coding tool or agent (Claude Code, Cursor, Codex, OpenCode, etc.)
-
-🧑‍💻 Check it out in action here: [OpenSaaS.sh](https://opensaas.sh)
-📚 Check out the Docs here: [Open SaaS Docs](https://docs.opensaas.sh)
-
-## What's inside?
-
-The template itself is built on top of some very powerful tools and frameworks, including:
-
-- 🐝 [Wasp](https://wasp.sh) - a full-stack React, NodeJS, Prisma framework with superpowers
-- 🚀 [Astro](https://starlight.astro.build/) - Astro's lightweight "Starlight" template for documentation and blog
-- 💸 [Stripe](https://stripe.com), [Polar.sh](https://polar.sh), or [Lemon Squeezy](https://lemonsqueezy.com/) - for products and payments
-- 💅 [ShadCN UI](https://tailwindcss.com) - for components & styling (plus admin dashboard!)
-- 🤖 [AI-Ready](https://docs.opensaas.sh/) - Custom Plugins, Skills, & Rules for AI-assisted coding with Claude Code, Cursor, or your favorite AI-assisted coding tool
-- 📈 [Plausible](https://plausible.io) or [Google](https://analytics.google.com/) Analytics
-- 🤖 [OpenAI](https://openai.com) - OpenAI API w/ function calling example
-- 📦 [AWS S3](https://aws.amazon.com/s3/) - for file uploads
-- 📧 [SendGrid](https://sendgrid.com), [MailGun](https://mailgun.com), or SMTP - for email sending
-- 🧪 [Playwright](https://playwright.dev) - end-to-end tests with Playwright
-
-Because we're using Wasp as the full-stack framework, we can leverage a lot of its features to build our SaaS in record time, including:
-
-- 🔐 [Full-stack Authentication](https://wasp.sh/docs/auth/overview) - Email verified + social Auth in a few lines of code.
-- ⛑ [End-to-end Type Safety](https://wasp.sh/docs/data-model/operations/overview) - Type your backend functions and get inferred types on the front-end automatically, without the need to install or configure any third-party libraries. Oh, and type-safe Links, too!
-- 🤖 [Jobs](https://wasp.sh/docs/advanced/jobs) - Run cron jobs in the background or set up queues simply by defining a function in the config file.
-- 🚀 [One-command Deploy](https://wasp.sh/docs/advanced/deployment/overview) - Easily deploy your DB, Server, & Client with one commaned to [Railway](https://railway.app) or [Fly.io](https://fly.io) via the CLI. Or deploy manually to any other hosting serivce of your choice.
-
-You also get access to Wasp's diverse, helpful community if you get stuck or need help.
-
-- 🤝 [Wasp Discord](https://discord.gg/aCamt5wCpS)
-
-## Getting Started
-
-### Simple Instructions
-
-First, to install the latest version of [Wasp](https://wasp.sh/) on macOS, Linux, or Windows with WSL, run the following command:
-
-```bash
-npm i -g @wasp.sh/wasp-cli
+```text
+就绪检查
+  -> Prompt 优化与评分
+  -> HTML 动画生成和沙箱预览
+  -> MP4 / WebM 后台渲染
+  -> 文章、作者、标签和素材管理
+  -> SEO 质量门禁
+  -> 发布、博客同步、metadata 和 sitemap 更新
+  -> 状态、失败重试和 AI 用量审计
 ```
 
-Then, create a new SaaS app with the following command:
+## 目录
+
+- `template/app`：Wasp、React、Prisma、PostgreSQL 应用与后台任务。
+- `template/blog`：Astro/Starlight 公开内容站、CMS 同步和 SEO 构建流水线。
+- `template/e2e-tests`：Playwright 核心业务流程测试。
+
+## 本地启动
+
+Wasp 在 Windows 上通过 WSL 运行。首次启动前准备 Node.js、Wasp CLI 和 PostgreSQL。
+
+### 1. 应用
+
+在 `template/app` 中：
 
 ```bash
-wasp new -t saas
+cp .env.client.example .env.client
+cp .env.server.example .env.server
+wasp start db
+wasp db migrate-dev
+wasp start
 ```
 
-This will create a **clean copy of the Open SaaS template** into a new directory, and you can start building your SaaS app right away!
+数据库就绪后即可启动核心服务；首次使用后台前必须在 `ADMIN_EMAILS` 配置至少一个受信邮箱，并用该邮箱完成注册。AI、发布 Hook、生产邮件和第三方分析是可选运行时集成，缺少配置时会显示明确的就绪状态。Starter 支付、通用文件上传和 AI 调度演示已经退出运行时，不再暴露接口。
 
-### Detailed Instructions
+如需在后台保存 AI 服务商密钥，先在 `.env.server` 设置稳定的 `AI_CONFIG_ENCRYPTION_KEY`。生成命令写在 `.env.server.example` 中。
 
-For everything you need to know about getting started and using this template, check out the [Open SaaS Docs](https://docs.opensaas.sh).
+视频文件在开发环境默认保存到用户目录；生产必须把 `AI_VIDEO_STORAGE_DIR` 设置为绝对路径并挂载持久卷，不能写入 `.wasp/out` 或临时容器目录。
 
-We've documented everything in great detail, including installation instructions, pulling updates to the template, guides for integrating services, SEO, deployment, and more. 🚀
+### 2. 博客
 
-## Getting Help & Providing Feedback
+在另一个终端进入 `template/blog`：
 
-There are two ways to get help or provide feedback (and we try to always respond quickly!):
-
-1. [Open an issue](https://github.com/wasp-lang/open-saas/issues)
-2. [Wasp Discord](https://discord.gg/aCamt5wCpS) -- please direct questions to the #🙋questions forum channel
-
-## Development Tools
-
-### Code Quality Tools
-
-This repository includes comprehensive code quality tooling to help maintain code standards:
-
-#### Prettier (Code Formatting)
-
-Prettier is configured for automatic code formatting across all JavaScript, TypeScript, and other supported files.
-
-```bash
-# Check if files are formatted correctly
-npm run prettier:check
-
-# Automatically format all files
-npm run prettier:format
+```powershell
+npm install
+$env:CMS_CONTENT_OFFLINE='1'
+npm run dev
 ```
 
-#### ESLint (Code Linting)
+在线同步时设置 `CMS_CONTENT_API_URL`，生产发布还必须提供真实的 `PUBLIC_SITE_URL`。
 
-ESLint is configured with TypeScript and React support to catch potential bugs and enforce code quality standards.
+## 本地地址
 
-```bash
-# Run ESLint to check for issues
-npm run lint
+- 应用：http://localhost:3000
+- API：http://localhost:3001
+- Blog：http://localhost:4321
+- PostgreSQL：localhost:5432
 
-# Automatically fix fixable issues
-npm run lint:fix
+## 验证
+
+```powershell
+cd template/app
+npm test
+npm run seo:generate
+npm run db:migrations:verify
+
+cd ../blog
+npm test
+$env:PUBLIC_SITE_URL='https://journal.motionpress.example'
+$env:PUBLIC_APP_URL='https://app.motionpress.example'
+$env:CMS_CONTENT_OFFLINE='1'
+npm run build
 ```
 
-The ESLint configuration includes:
+`npm run build` 按生产发布处理，因此会拒绝缺失、localhost、私网或非 HTTPS 的公开 URL，并要求 `ADMIN_EMAILS`、SendGrid 与已验证发件地址。应用本地代码检查使用 `wasp compile`。
 
-- TypeScript support with `@typescript-eslint`
-- React and React Hooks linting
-- Sensible defaults tuned for a SaaS application
-- Automatic support for CommonJS (.cjs), ES Modules (.mjs), and TypeScript files
+完整交付还需要在运行中的本地栈上执行 `template/e2e-tests`，并检查桌面和移动端截图。
 
-Both Prettier and ESLint checks are automatically run in CI/CD pipelines to ensure code quality.
+## 技术基础
 
-For information about other development tools used to maintain derived projects (like opensaas.sh and template-test), see [tools/README.md](./tools/README.md).
+项目使用 Wasp、React、TypeScript、Prisma、PostgreSQL、PgBoss、Astro、Starlight 与 Playwright，并保留对 OpenAI-compatible 模型服务的运行时配置能力。
 
-## Contributing
-
-Note that we've tried to get as many of the core features of a SaaS app into this template as possible, but there still might be some missing features or functionality.
-
-We could always use some help tying up loose ends: contributions are welcome! Check out [CONTRIBUTING.md](/CONTRIBUTING.md) for more details.
+本项目最初基于 [Open SaaS](https://opensaas.sh) 与 [Wasp](https://wasp.sh) 构建。

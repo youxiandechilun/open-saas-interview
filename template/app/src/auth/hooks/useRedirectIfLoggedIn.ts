@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "wasp/client/auth";
+import { routes } from "wasp/client/router";
 
-export function useRedirectIfLoggedIn(redirectTo = "/demo-app") {
+export function useRedirectIfLoggedIn(redirectTo = routes.AiStudioRoute.to) {
   const { data: user } = useAuth();
   const navigate = useNavigate();
 

@@ -1,8 +1,11 @@
 export const AI_HOURLY_REQUEST_LIMIT = 20;
-export const AI_HOURLY_TOKEN_LIMIT = 100_000;
 export const AI_MAX_CONCURRENT_REQUESTS = 2;
 export const AI_MAX_PROMPT_LENGTH = 4_000;
 export const VIDEO_MAX_ATTEMPTS = 3;
+// Browser launch, capture, video save, and transcoding can each have their own
+// timeout. Keep the ownership lease comfortably above their combined budget.
+export const VIDEO_JOB_LEASE_MS = 15 * 60_000;
+export const VIDEO_USAGE_RESERVATION_MS = 30 * 60_000;
 
 export function startOfUtcHour(date: Date): Date {
   const start = new Date(date);

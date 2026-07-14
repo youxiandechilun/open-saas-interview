@@ -175,35 +175,81 @@
 }
 
 @utility text-gradient-primary {
-  /* Text gradient utilities */
-  background: linear-gradient(
-    to right,
-    hsl(var(--secondary-muted)),
-    hsl(var(--secondary))
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: hsl(var(--primary));
+}
+
+@keyframes motionpress-word {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-9%, 0, 0);
+  }
+}
+
+@keyframes motionpress-caption {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(12%, -18%, 0);
+  }
+}
+
+@keyframes motionpress-block {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(-120%, -30%, 0) rotate(18deg);
+  }
+}
+
+@keyframes motionpress-playhead {
+  0%,
+  100% {
+    transform: scaleX(0.3);
+  }
+  50% {
+    transform: scaleX(1);
+  }
+}
+
+.motionpress-scene-word {
+  animation: motionpress-word 7s ease-in-out infinite;
+}
+
+.motionpress-scene-caption {
+  animation: motionpress-caption 5s ease-in-out infinite;
+}
+
+.motionpress-scene-block {
+  animation: motionpress-block 6s ease-in-out infinite;
+}
+
+.motionpress-playhead > span {
+  transform-origin: left center;
+  animation: motionpress-playhead 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motionpress-scene-word,
+  .motionpress-scene-caption,
+  .motionpress-scene-block,
+  .motionpress-playhead > span {
+    animation: none;
+  }
 }
 
 @utility text-gradient-primary-diagonal {
-  background: linear-gradient(
-    135deg,
-    hsl(var(--secondary-muted)),
-    hsl(var(--secondary))
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: hsl(var(--primary));
 }
 
 @utility border-gradient-primary {
-  /* Border gradient utilities */
-  background: linear-gradient(
-    to right,
-    hsl(var(--secondary-muted)),
-    hsl(var(--secondary))
-  );
+  background: hsl(var(--border));
   padding: 1px;
 
   & > * {
@@ -213,68 +259,68 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --background: 210 29% 97%;
+    --foreground: 210 30% 13%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 210 30% 13%;
     --card-accent: 0 0% 100%;
-    --card-accent-foreground: 0 0% 3.9%;
-    --card-subtle: 31 57% 96%;
-    --card-subtle-foreground: 0 0% 9%;
+    --card-accent-foreground: 210 30% 13%;
+    --card-subtle: 210 25% 96%;
+    --card-subtle-foreground: 210 30% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 210 100% 13%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 32 100% 37%;
-    --secondary-foreground: 0 0% 9%;
-    --secondary-muted: 32 75% 78%;
-    --secondary-muted-foreground: 0 0% 3.9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 33 74% 62%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 210 30% 13%;
+    --primary: 210 88% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 69% 51%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-muted: 24 73% 92%;
+    --secondary-muted-foreground: 24 64% 28%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 210 15% 35%;
+    --accent: 210 55% 92%;
+    --accent-foreground: 210 75% 27%;
+    --destructive: 0 67% 45%;
     --destructive-foreground: 0 0% 98%;
-    --success: 141 71% 48%;
+    --success: 151 61% 32%;
     --success-foreground: 0 0% 98%;
-    --warning: 36 100% 50%;
-    --warning-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --warning: 38 92% 43%;
+    --warning-foreground: 38 70% 12%;
+    --border: 210 20% 85%;
+    --input: 210 20% 78%;
+    --ring: 210 88% 36%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 210 50% 5%;
-    --foreground: 0 0% 98%;
-    --card: 210 50% 5%;
-    --card-foreground: 0 0% 98%;
-    --card-accent: 31 57% 93%;
-    --card-accent-foreground: 0 0% 3.9%;
-    --card-subtle: 233 24% 15%;
-    --card-subtle-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 31 57% 93%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 209 91% 61%;
-    --secondary-foreground: 0 0% 98%;
-    --secondary-muted: 210 67% 94%;
-    --secondary-muted-foreground: 0 0% 3.9%;
-    --muted: 210 100% 13%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 31 57% 93%;
-    --accent-foreground: 210 100% 13%;
-    --destructive: 0 62.8% 63%;
+    --background: 210 10% 9%;
+    --foreground: 210 18% 92%;
+    --card: 210 9% 12%;
+    --card-foreground: 210 18% 92%;
+    --card-accent: 210 9% 14%;
+    --card-accent-foreground: 210 18% 92%;
+    --card-subtle: 210 9% 15%;
+    --card-subtle-foreground: 210 18% 92%;
+    --popover: 210 9% 12%;
+    --popover-foreground: 210 18% 92%;
+    --primary: 210 81% 62%;
+    --primary-foreground: 210 30% 9%;
+    --secondary: 24 76% 58%;
+    --secondary-foreground: 24 45% 9%;
+    --secondary-muted: 24 28% 22%;
+    --secondary-muted-foreground: 24 70% 82%;
+    --muted: 210 8% 18%;
+    --muted-foreground: 210 12% 68%;
+    --accent: 210 25% 22%;
+    --accent-foreground: 210 80% 84%;
+    --destructive: 0 67% 58%;
     --destructive-foreground: 0 0% 98%;
-    --success: 141 71% 48%;
+    --success: 151 52% 48%;
     --success-foreground: 0 0% 98%;
-    --warning: 36 100% 50%;
-    --warning-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --warning: 38 82% 56%;
+    --warning-foreground: 38 70% 10%;
+    --border: 210 8% 25%;
+    --input: 210 8% 32%;
+    --ring: 210 81% 62%;
   }
 }
 
@@ -283,7 +329,10 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+    letter-spacing: 0;
   }
 }
 

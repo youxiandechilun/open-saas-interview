@@ -9,10 +9,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../client/components/ui/dropdown-menu";
-import { userMenuItems } from "./constants";
+import { useI18n } from "../i18n";
+import { canViewUserMenuItem, userMenuItems } from "./constants";
 
 export function UserDropdown({ user }: { user: Partial<UserEntity> }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -27,11 +29,10 @@ export function UserDropdown({ user }: { user: Partial<UserEntity> }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {userMenuItems.map((item) => {
-          if (item.isAuthRequired && !user) return null;
-          if (item.isAdminOnly && (!user || !user.isAdmin)) return null;
+          if (!canViewUserMenuItem(item, user)) return null;
 
           return (
-            <DropdownMenuItem key={item.name}>
+            <DropdownMenuItem key={item.labelKey}>
               <WaspRouterLink
                 to={item.to}
                 onClick={() => {
@@ -40,7 +41,7 @@ export function UserDropdown({ user }: { user: Partial<UserEntity> }) {
                 className="flex w-full items-center gap-3"
               >
                 <item.icon size="1.1rem" />
-                {item.name}
+                {t(item.labelKey)}
               </WaspRouterLink>
             </DropdownMenuItem>
           );
@@ -52,7 +53,7 @@ export function UserDropdown({ user }: { user: Partial<UserEntity> }) {
             className="flex w-full items-center gap-3"
           >
             <LogOut size="1.1rem" />
-            Log Out
+            {t("menu.logout")}
           </button>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -1,91 +1,47 @@
-# Starlight Starter Kit: Basics
+# MotionPress Journal
 
-## CMS publication and SEO contract
+MotionPress 的公开内容站。文章既可以来自仓库中的 Markdown，也可以在构建前从 MotionPress CMS 的公开 feed 同步。两种来源统一进入 Astro/Starlight 的 canonical、Open Graph、Twitter Card、JSON-LD、robots 与 sitemap 流水线。
 
-The blog can build from the checked-in sample Markdown posts or from the public
-CMS feed. The same Starlight content collection renders both sources, so CMS
-posts automatically enter Starlight's existing sitemap and canonical flow and
-receive the blog Open Graph, Twitter, article, and JSON-LD metadata.
+## 环境变量
 
-Set these environment variables in the blog build environment:
+| 变量                    | 生产要求                 | 用途                                    |
+| ----------------------- | ------------------------ | --------------------------------------- |
+| `PUBLIC_SITE_URL`       | 必填，公网 HTTPS         | Journal 的 canonical 与 sitemap 源站    |
+| `PUBLIC_APP_URL`        | 必填，公网 HTTPS         | 返回工作台及公开动画素材的源站          |
+| `CMS_CONTENT_API_URL`   | 在线构建必填，公网 HTTPS | CMS 已发布文章 feed                     |
+| `CMS_CONTENT_API_TOKEN` | 可选                     | 受保护 feed 的 Bearer token，不写入产物 |
+| `CMS_CONTENT_OFFLINE`   | 仅离线快照构建           | 显式设为 `1` 时保留现有内容，不静默回退 |
 
-| Variable | Required | Purpose |
-| :-- | :-- | :-- |
-| `CMS_CONTENT_API_URL` | No | Direct URL of the public `PublishedCmsFeed` JSON endpoint. When omitted, sync runs offline and leaves local samples untouched. |
-| `CMS_CONTENT_API_TOKEN` | No | Bearer token for a protected deployment feed. It is never written to generated content. |
-| `CMS_CONTENT_OFFLINE` | No | Set to `true` to force offline mode even when a URL exists. |
-| `PUBLIC_SITE_URL` | Production | Public origin used by Astro canonical URLs, sitemap, robots, and the SEO manifest. |
+缺少 CMS URL 时，普通构建会失败。只有显式设置 `CMS_CONTENT_OFFLINE=1` 才允许使用本地快照；`npm run content:publish` 永远要求在线 CMS，避免把旧内容误发布到生产环境。
 
-The feed shape is `{ contentVersion, updatedAt, posts }`. The adapter imports
-only `PUBLISHED` posts and validates IDs, slugs, dates, authors, tags, and the
-canonical `/blog/<slug>/` path. It stages all files before atomically replacing
-`src/content/docs/blog/cms-generated/`; stale CMS files disappear only after a
-complete successful fetch and validation. Generated runtime files are ignored
-by Git.
+## 常用命令
 
-`npm run content:publish` is the production entrypoint. It fails fast when
-`PUBLIC_SITE_URL` or `CMS_CONTENT_API_URL` is missing or still a placeholder.
-Its prebuild hook:
-
-1. syncs published CMS content (or explicitly stays offline),
-2. runs the SEO quality gate,
-3. writes `public/blog-seo-manifest.json`, and
-4. builds Astro, Starlight's sitemap, `robots.txt`, and all page metadata.
-
-The build fails on missing descriptions, duplicate H1s, missing image alt text,
-missing canonical support, or broken internal routes. Title/description length,
-missing H2 sections, and missing internal links are actionable warnings. Run
-`npm run seo:check` for a read-only report, `npm test` for zero-dependency Node
-tests, and `npm run test:build` to recheck an existing `dist/` directory.
-
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
-
-```
-npm create astro@latest -- --template starlight
+```powershell
+npm install
+npm test
+npm run dev
 ```
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/starlight/tree/main/examples/basics)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/starlight/tree/main/examples/basics)
+本地开发默认运行在 `http://localhost:4321`。验证离线生产构建时，需要给出非本地的部署 URL：
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   ├── docs/
-│   │   └── config.ts
-│   └── env.d.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```powershell
+$env:PUBLIC_SITE_URL='https://journal.motionpress.example'
+$env:PUBLIC_APP_URL='https://app.motionpress.example'
+$env:CMS_CONTENT_OFFLINE='1'
+npm run build
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+在线发布入口：
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+```powershell
+$env:PUBLIC_SITE_URL='https://journal.motionpress.example'
+$env:PUBLIC_APP_URL='https://app.motionpress.example'
+$env:CMS_CONTENT_API_URL='https://api.motionpress.example/content-cms/published'
+npm run content:publish
+```
 
-Static assets, like favicons, can be placed in the `public/` directory.
+## 发布契约
 
-## 🧞 Commands
+公开 feed 只接收 `PUBLISHED` 文章，并校验 ID、slug、发布时间、作者、标签及 `/blog/<slug>/` canonical。同步过程先写入暂存目录，再原子替换 `src/content/docs/blog/cms-generated/`，校验或网络失败时不会留下半套内容。
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+构建顺序固定为：CMS 同步、SEO 质量门禁、SEO manifest、Astro 构建与产物断言。标题、摘要、H1、图片 alt、canonical 或内部路由存在阻断问题时，构建直接失败；H2 与内链不足会给出可操作建议。

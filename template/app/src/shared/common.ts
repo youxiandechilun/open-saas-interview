@@ -1,2 +1,8 @@
 export const DocsUrl = "https://docs.opensaas.sh";
-export const BlogUrl = "https://docs.opensaas.sh/blog";
+const configuredBlogUrl =
+  import.meta.env.REACT_APP_BLOG_URL?.trim() ||
+  "https://docs.opensaas.sh/blog/";
+
+export const BlogUrl = configuredBlogUrl.endsWith("/")
+  ? configuredBlogUrl
+  : `${configuredBlogUrl}/`;

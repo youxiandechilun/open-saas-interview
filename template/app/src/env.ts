@@ -2,33 +2,45 @@ import { defineEnvValidationSchema } from "wasp/env";
 
 import * as z from "zod";
 import { aiStudioEnvSchema } from "./ai-studio/env";
-import { googleAnalyticsEnvSchema, plausibleEnvSchema } from "./analytics/env";
 import { authEnvSchema } from "./auth/env";
 import { contentCmsEnvSchema } from "./content-cms/env";
-import { demoAiAppEnvSchema } from "./demo-ai-app/env";
-import { fileUploadEnvSchema } from "./file-upload/env";
-import { lemonSqueezyEnvSchema } from "./payment/lemonSqueezy/env";
-import { polarEnvSchema } from "./payment/polar/env";
-import { stripeEnvSchema } from "./payment/stripe/env";
+
+const optionalAnalyticsEnvSchema = z.object({
+  PLAUSIBLE_API_KEY: z.string().default("disabled"),
+  PLAUSIBLE_SITE_ID: z.string().default("disabled"),
+  PLAUSIBLE_BASE_URL: z.string().default("https://disabled.invalid"),
+  GOOGLE_ANALYTICS_CLIENT_EMAIL: z.string().default("disabled@invalid.local"),
+  GOOGLE_ANALYTICS_PRIVATE_KEY: z.string().default("disabled"),
+  GOOGLE_ANALYTICS_PROPERTY_ID: z.string().default("disabled"),
+});
+
+const optionalServerSecret = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length === 0 ? undefined : value,
+  z.string().trim().min(1).optional(),
+);
+
+const emailDeliveryEnvSchema = z.object({
+  EMAIL_PROVIDER: z.enum(["Dummy", "SendGrid"]).default("Dummy"),
+  SENDGRID_API_KEY: optionalServerSecret,
+  EMAIL_FROM_ADDRESS: z
+    .string()
+    .trim()
+    .min(3)
+    .default("noreply@motionpress.local"),
+  EMAIL_FROM_NAME: z.string().trim().min(1).max(120).default("MotionPress"),
+});
 
 // Wasp merges this schema with its built-in env var validations and uses it
 // to validate `process.env` at server startup. Access the validated env vars
 // with `import { env } from 'wasp/server'` instead of using `process.env` directly.
 // https://wasp.sh/docs/project/env-vars#custom-env-var-validations
-//
-// If you remove a feature (e.g. an analytics or payment provider), make sure
-// to also remove its env schema import and `...schema.shape` below.
 export const serverEnvValidationSchema = defineEnvValidationSchema(
   z.object({
     ...authEnvSchema.shape,
     ...aiStudioEnvSchema.shape,
-    ...stripeEnvSchema.shape,
-    ...lemonSqueezyEnvSchema.shape,
-    ...polarEnvSchema.shape,
-    ...demoAiAppEnvSchema.shape,
     ...contentCmsEnvSchema.shape,
-    ...fileUploadEnvSchema.shape,
-    ...plausibleEnvSchema.shape,
-    ...googleAnalyticsEnvSchema.shape,
+    ...emailDeliveryEnvSchema.shape,
+    ...optionalAnalyticsEnvSchema.shape,
   }),
 );

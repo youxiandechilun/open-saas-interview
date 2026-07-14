@@ -1,90 +1,186 @@
 ---
-import { logos } from 'virtual:starlight/user-images';
-import config from 'virtual:starlight/user-config';
-import blogConfig from 'virtual:starlight-blog-config'
+import blogConfig from 'virtual:starlight-blog-config';
 import type { Props } from '@astrojs/starlight/props';
 
-const href = Astro.site
+const href = Astro.site;
+const appHref = import.meta.env.PUBLIC_APP_URL?.trim() || 'http://localhost:3000/';
 const { siteTitle } = Astro.props;
 ---
-<a {href} class="site-title sl-flex">
-	{
-		config.logo && logos.dark && (
-			<>
-				<img
-					class:list={{ 'light:sl-hidden': !('src' in config.logo) }}
-					alt={config.logo.alt}
-					src={logos.dark.src}
-					width={logos.dark.width}
-					height={logos.dark.height}
-				/>
-				{/* Show light alternate if a user configure both light and dark logos. */}
-				{!('src' in config.logo) && (
-					<img
-						class="dark:sl-hidden"
-						alt={config.logo.alt}
-						src={logos.light?.src}
-						width={logos.light?.width}
-						height={logos.light?.height}
-					/>
-				)}
-			</>
-		)
-	}
-	<span class:list={{ 'sr-only': config.logo?.replacesTitle }} class="dark:text-white hover:text-yellow-500">
-		{siteTitle}
-	</span>
-</a>
-<div>
-  <a href="/" class="text-gray-900 hover:text-yellow-500 dark:text-white">Docs</a>
+
+<div class="header-group">
+	<a {href} class="site-title sl-flex">
+		<span class="brand-mark" aria-hidden="true">M</span>
+		<span
+			class="site-name"
+			data-en={siteTitle}
+			data-zh="MotionPress 内容中心"
+		>
+			{siteTitle}
+		</span>
+	</a>
+
+	<a class="desktop-link" href="/blog/" data-en={blogConfig.title} data-zh="文章">
+		{blogConfig.title}
+	</a>
+	<a class="desktop-link" href="/guides/publishing-workflow/" data-en="Publishing guide" data-zh="发布指南">
+		Publishing guide
+	</a>
+	<a class="desktop-link" href={appHref} data-en="Workspace" data-zh="工作台">
+		Workspace
+	</a>
+	<a class="mobile-app-link" href={appHref} data-en="Workspace" data-zh="工作台">Workspace</a>
+	<button class="locale-toggle" id="blog-locale-toggle" type="button" aria-label="切换到中文">
+		中
+	</button>
 </div>
-<div>
-  <a href="/blog/" class="text-gray-900 hover:text-yellow-500 dark:text-white">{blogConfig.title}</a>
-</div>
+
+<script is:inline>
+	(() => {
+		const storageKey = 'motionpress.locale';
+		const button = document.getElementById('blog-locale-toggle');
+		if (!button) return;
+
+		const readLocale = () => {
+			try {
+				const stored = window.localStorage.getItem(storageKey);
+				if (stored === 'en' || stored === 'zh-CN') return stored;
+			} catch {}
+			return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+		};
+
+		const applyLocale = (locale) => {
+			document.documentElement.lang = locale;
+			document.querySelectorAll('[data-en][data-zh]').forEach((element) => {
+				element.textContent = locale === 'zh-CN' ? element.dataset.zh : element.dataset.en;
+			});
+			button.textContent = locale === 'zh-CN' ? 'EN' : '中';
+			button.setAttribute('aria-label', locale === 'zh-CN' ? 'Switch to English' : '切换到中文');
+		};
+
+		let locale = readLocale();
+		applyLocale(locale);
+
+		button.addEventListener('click', () => {
+			locale = locale === 'zh-CN' ? 'en' : 'zh-CN';
+			try {
+				window.localStorage.setItem(storageKey, locale);
+			} catch {}
+			applyLocale(locale);
+		});
+
+		window.addEventListener('storage', (event) => {
+			if (event.key !== storageKey || (event.newValue !== 'en' && event.newValue !== 'zh-CN')) return;
+			locale = event.newValue;
+			applyLocale(locale);
+		});
+	})();
+</script>
 
 <style>
+	.header-group {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 0.65rem;
+	}
+
 	.site-title {
-		justify-self: flex-start;
-		max-width: 100%;
-		overflow: hidden;
+		min-width: 0;
 		align-items: center;
 		color: var(--sl-color-gray-9);
-		gap: var(--sl-nav-gap);
 		font-size: var(--sl-text-h4);
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.site-name,
+	.desktop-link {
+		display: none;
+	}
+
+	.brand-mark {
+		display: inline-flex;
+		width: 2rem;
+		height: 2rem;
+		flex: 0 0 2rem;
+		align-items: center;
+		justify-content: center;
+		border-radius: 0.375rem;
+		background: #0b5cad;
+		color: #fff;
+		font-size: 0.875rem;
+		font-weight: 800;
+	}
+
+	.header-group a {
+		color: var(--sl-color-text);
 		font-weight: 600;
 		text-decoration: none;
-		white-space: nowrap;
-    padding-inline-end: 1rem;
-    border-inline-end: 1px solid var(--sl-color-gray-5);
 	}
-	img {
-		height: calc(var(--sl-nav-height) - 2 * var(--sl-nav-pad-y));
-		width: auto;
-		max-width: 100%;
-		object-fit: contain;
-		object-position: 0 50%;
-	}
-  div {
-    border-inline-end: 1px solid var(--sl-color-gray-5);
-    margin-left: 1rem;
-    align-self: center;
-    gap: 1rem;
-    height: 100%;
-    padding-inline-end: 1rem;
-  }
 
-  @media (min-width: 50rem) {
-    div {
-      align-items: center;
-      display: flex;
-    }
-  }
-  a {
-    color: var(--sl-color-text-accent);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  a:hover {
-		opacity: 0.66;
+	.header-group a:hover {
+		color: #0b5cad;
+	}
+
+	.mobile-app-link {
+		font-size: 0.8rem;
+		white-space: nowrap;
+	}
+
+	.locale-toggle {
+		display: inline-flex;
+		width: 2rem;
+		height: 2rem;
+		flex: 0 0 2rem;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.25rem;
+		background: transparent;
+		color: var(--sl-color-text);
+		font-size: 0.75rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.locale-toggle:hover {
+		background: #dceaf7;
+	}
+
+	@media (min-width: 50rem) {
+		.header-group {
+			gap: 0;
+		}
+
+		.site-title {
+			max-width: 100%;
+			overflow: hidden;
+			gap: var(--sl-nav-gap);
+			padding-inline-end: 1rem;
+			border-inline-end: 1px solid var(--sl-color-gray-5);
+			white-space: nowrap;
+		}
+
+		.site-name,
+		.desktop-link {
+			display: inline-flex;
+		}
+
+		.desktop-link {
+			align-items: center;
+			align-self: stretch;
+			margin-left: 1rem;
+			padding-inline-end: 1rem;
+			border-inline-end: 1px solid var(--sl-color-gray-5);
+			white-space: nowrap;
+		}
+
+		.mobile-app-link {
+			display: none;
+		}
+
+		.locale-toggle {
+			margin-left: 1rem;
+		}
 	}
 </style>

@@ -4,6 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../../client/components/ui/accordion";
+import { useI18n } from "../../i18n";
 
 interface FAQ {
   id: number;
@@ -13,10 +14,12 @@ interface FAQ {
 }
 
 export function FAQ({ faqs }: { faqs: FAQ[] }) {
+  const { t } = useI18n();
+
   return (
     <div className="mx-auto mt-32 max-w-4xl px-6 pb-8 sm:pb-24 sm:pt-12 lg:max-w-7xl lg:px-8 lg:py-32">
       <h2 className="text-foreground mb-12 text-center text-2xl font-bold leading-10 tracking-tight">
-        Frequently asked questions
+        {t("landing.faq.title")}
       </h2>
 
       <Accordion type="single" collapsible className="w-full space-y-4">
@@ -39,7 +42,7 @@ export function FAQ({ faqs }: { faqs: FAQ[] }) {
                     href={faq.href}
                     className="text-primary hover:text-primary/80 shrink-0 whitespace-nowrap text-base font-medium leading-7 transition-colors duration-200"
                   >
-                    Learn more →
+                    {t("landing.faq.learnMore")} →
                   </a>
                 )}
               </div>

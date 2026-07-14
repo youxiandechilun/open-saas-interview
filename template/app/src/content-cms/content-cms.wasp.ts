@@ -2,6 +2,7 @@ import { action, api, job, page, query, route, type Spec } from "@wasp.sh/spec";
 
 import { ContentCmsPage } from "./ContentCmsPage" with { type: "ref" };
 import { getPublishedCmsContentApi } from "./contentApi" with { type: "ref" };
+import { getPublishedCmsAnimationMediaApi } from "./publicMediaApi" with { type: "ref" };
 import {
   createCmsAuthor,
   createCmsPost,
@@ -10,8 +11,9 @@ import {
   deleteCmsPost,
   deleteCmsTag,
   getCmsPosts,
+  getCmsPublicationTasks,
   getCmsTaxonomy,
-  getPublishedCmsPosts,
+  retryCmsPublicationEvent,
   updateCmsAuthor,
   updateCmsPost,
   updateCmsTag,
@@ -24,21 +26,52 @@ export const contentCmsSpec: Spec = [
     "/admin/content",
     page(ContentCmsPage, { authRequired: true }),
   ),
-  query(getCmsPosts, { entities: ["CmsPost", "CmsAuthor", "CmsTag"] }),
-  query(getPublishedCmsPosts, {
-    entities: ["CmsPost", "CmsAuthor", "CmsTag"],
-    auth: false,
+  query(getCmsPosts, {
+    entities: [
+      "CmsPost",
+      "CmsAuthor",
+      "CmsTag",
+      "CmsPublicationEvent",
+      "AiAnimation",
+      "User",
+    ],
+  }),
+  query(getCmsPublicationTasks, {
+    entities: ["User", "CmsPublicationEvent"],
   }),
   api("GET", "/content-cms/published", getPublishedCmsContentApi, {
-    entities: ["CmsPost", "CmsAuthor", "CmsTag"],
+    entities: ["CmsPost", "CmsAuthor", "CmsTag", "AiAnimation", "User"],
     auth: false,
   }),
-  query(getCmsTaxonomy, { entities: ["CmsAuthor", "CmsTag", "CmsPost"] }),
+  api("GET", "/content-cms/media/:id", getPublishedCmsAnimationMediaApi, {
+    entities: ["CmsPost", "AiAnimation"],
+    auth: false,
+  }),
+  query(getCmsTaxonomy, {
+    entities: ["CmsAuthor", "CmsTag", "CmsPost", "AiAnimation", "User"],
+  }),
+  action(retryCmsPublicationEvent, {
+    entities: ["User", "CmsPublicationEvent"],
+  }),
   action(createCmsPost, {
-    entities: ["User", "CmsPost", "CmsAuthor", "CmsTag", "CmsPublicationEvent"],
+    entities: [
+      "User",
+      "CmsPost",
+      "CmsAuthor",
+      "CmsTag",
+      "CmsPublicationEvent",
+      "AiAnimation",
+    ],
   }),
   action(updateCmsPost, {
-    entities: ["CmsPost", "CmsAuthor", "CmsTag", "CmsPublicationEvent"],
+    entities: [
+      "CmsPost",
+      "CmsAuthor",
+      "CmsTag",
+      "CmsPublicationEvent",
+      "AiAnimation",
+      "User",
+    ],
   }),
   action(deleteCmsPost, {
     entities: ["CmsPost", "CmsAuthor", "CmsTag", "CmsPublicationEvent"],

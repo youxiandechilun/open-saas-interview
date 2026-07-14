@@ -28,6 +28,19 @@ const cmsPost = {
   canonicalPath: "/blog/content-operations-guide/",
 };
 
+const publishedAnimation = {
+  id: "f7b8e395-8658-4f1d-8f74-f38ca971c536",
+  title: "Launch <script>demo</script>",
+  description: "A safe reusable motion asset.",
+  status: "READY",
+  videoStatus: "SUCCEEDED",
+  videoFormat: "mp4",
+  videoMimeType: "video/mp4",
+  publicMediaPath: "/content-cms/media/f7b8e395-8658-4f1d-8f74-f38ca971c536",
+  html: "<script>must-not-leak()</script>",
+  videoStoragePath: "C:/private/video.mp4",
+};
+
 test("CMS feed adapter imports only valid PUBLISHED posts", () => {
   const feed = normalizePublishedFeed({
     contentVersion: "v3",
@@ -69,6 +82,62 @@ test("CMS Markdown uses the canonical slug and escapes frontmatter values", () =
   assert.match(markdown, /## Begin with ownership/);
 });
 
+test("CMS animation media is normalized and rendered without private fields", () => {
+  const feed = normalizePublishedFeed(
+    {
+      posts: [{ ...cmsPost, animation: publishedAnimation }],
+    },
+    { mediaBaseUrl: "https://api.example.test/content-cms/published" },
+  );
+  const animation = feed.posts[0].animation;
+
+  assert.equal(
+    animation.publicMediaUrl,
+    "https://api.example.test/content-cms/media/f7b8e395-8658-4f1d-8f74-f38ca971c536",
+  );
+  assert.equal("html" in animation, false);
+  assert.equal("videoStoragePath" in animation, false);
+
+  const markdown = renderCmsPost(feed.posts[0]);
+  assert.match(markdown, /<video controls preload="metadata" playsinline/);
+  assert.match(markdown, /type="video\/mp4"/);
+  assert.match(markdown, /Launch &lt;script&gt;demo&lt;\/script&gt;/);
+  assert.doesNotMatch(markdown, /must-not-leak|C:\/private/);
+});
+
+test("CMS animation media rejects unsafe paths and MIME mismatches", () => {
+  assert.throws(
+    () =>
+      normalizePublishedFeed({
+        posts: [
+          {
+            ...cmsPost,
+            animation: {
+              ...publishedAnimation,
+              publicMediaPath: "https://evil.example/video.mp4",
+            },
+          },
+        ],
+      }),
+    /unsafe public media metadata/i,
+  );
+  assert.throws(
+    () =>
+      normalizePublishedFeed({
+        posts: [
+          {
+            ...cmsPost,
+            animation: {
+              ...publishedAnimation,
+              videoMimeType: "text/html",
+            },
+          },
+        ],
+      }),
+    /unsafe public media metadata/i,
+  );
+});
+
 test("generated CMS directory replacement removes stale output deterministically", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "open-saas-cms-sync-"));
   const target = path.join(root, "cms-generated");
@@ -93,28 +162,20 @@ test("generated CMS directory replacement removes stale output deterministically
   }
 });
 
-test("offline CMS sync leaves existing local content untouched", async () => {
+test("offline CMS sync removes stale generated content deterministically", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "open-saas-cms-offline-"));
   const target = path.join(root, "cms-generated");
 
   try {
     await replaceGeneratedContent({ targetDir: target, posts: [cmsPost] });
-    const before = await readFile(
-      path.join(target, `${cmsPost.slug}.md`),
-      "utf8",
-    );
     const result = await syncCmsContent({
       targetDir: target,
       url: "",
       offline: true,
     });
-    const after = await readFile(
-      path.join(target, `${cmsPost.slug}.md`),
-      "utf8",
-    );
 
     assert.equal(result.mode, "offline");
-    assert.equal(after, before);
+    assert.deepEqual(await readdir(target), []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -135,7 +196,10 @@ test("online CMS sync sends optional auth and installs the validated feed", asyn
         return {
           ok: true,
           status: 200,
-          json: async () => ({ contentVersion: "v4", posts: [cmsPost] }),
+          json: async () => ({
+            contentVersion: "v4",
+            posts: [{ ...cmsPost, animation: publishedAnimation }],
+          }),
         };
       },
     });
@@ -147,7 +211,7 @@ test("online CMS sync sends optional auth and installs the validated feed", asyn
     assert.equal(result.contentVersion, "v4");
     assert.match(
       await readFile(path.join(target, `${cmsPost.slug}.md`), "utf8"),
-      /^title:/m,
+      /https:\/\/cms\.example\.test\/content-cms\/media\//,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

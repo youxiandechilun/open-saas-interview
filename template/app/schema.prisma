@@ -7,13 +7,22 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum UserRole {
+  ADMIN
+  EDITOR
+  CREATOR
+}
+
 model User {
   id                        String          @id @default(uuid())
   createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
 
   email                     String?         @unique
   username                  String?         @unique
   isAdmin                   Boolean         @default(false)
+  role                      UserRole        @default(CREATOR)
+  isDisabled                Boolean         @default(false)
 
   paymentProcessorUserId    String?         @unique
   lemonSqueezyCustomerPortalUrl String?     // You can delete this if you're not using Lemon Squeezy as your payments processor.
@@ -30,6 +39,9 @@ model User {
   aiAnimations              AiAnimation[]
   aiUsageLogs               AiUsageLog[]
   aiQuotaWindows            AiQuotaWindow[]
+  updatedAiProviderConfigs  AiProviderConfig[] @relation("AiProviderConfigUpdatedBy")
+
+  @@index([role, isDisabled])
 }
 
 model GptResponse {
@@ -163,11 +175,14 @@ model CmsPost {
   createdById String
   author      CmsAuthor @relation(fields: [authorId], references: [id], onDelete: Restrict)
   authorId    String
+  animation   AiAnimation? @relation(fields: [animationId], references: [id], onDelete: SetNull)
+  animationId String?
   tags        CmsTag[]
 
   @@index([status, publishedAt])
   @@index([authorId, status])
   @@index([createdById, updatedAt])
+  @@index([animationId])
 }
 
 model CmsPublicationEvent {
@@ -232,6 +247,7 @@ model AiAnimation {
   videoUpdatedAt   DateTime?
   videoLeaseExpiresAt DateTime?
 
+  cmsPosts  CmsPost[]
   usageLogs AiUsageLog[]
 
   @@index([userId, createdAt])
@@ -283,4 +299,22 @@ model AiQuotaWindow {
 
   @@unique([userId, operation, windowStart])
   @@index([userId, windowStart])
+}
+
+model AiProviderConfig {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  baseUrl         String
+  model           String
+  encryptedApiKey String
+  apiKeyHint      String
+  hourlyTokenLimit      Int     @default(100000)
+  maxCompletionTokens   Int     @default(12000)
+
+  updatedBy   User   @relation("AiProviderConfigUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  updatedById String
+
+  @@index([updatedById])
 }

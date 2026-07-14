@@ -4,9 +4,10 @@ Disallow: /account
 Disallow: /admin
 Disallow: /ai-studio
 Disallow: /checkout
-Disallow: /demo-app
-Disallow: /file-upload
+Disallow: /email-verification
 Disallow: /login
+Disallow: /password-reset
+Disallow: /request-password-reset
 Disallow: /signup
 
-Sitemap: https://your-saas-app.com/sitemap.xml
+Sitemap: http://localhost:3000/sitemap.xml

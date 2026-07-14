@@ -1,9 +1,15 @@
 import { defineUserSignupFields } from "wasp/auth/providers/types";
 import { env } from "wasp/server";
 import { z } from "zod";
+import { getInitialUserRole } from "../user/accessPolicy";
 
 function isAdminEmail(email: string): boolean {
-  return env.ADMIN_EMAILS.includes(email);
+  return env.ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
+
+function getInitialAccess(email: string, isVerified = true) {
+  const isAdmin = isVerified && isAdminEmail(email);
+  return { isAdmin, role: getInitialUserRole(isAdmin) };
 }
 
 const emailDataSchema = z.object({
@@ -21,7 +27,11 @@ export const getEmailUserFields = defineUserSignupFields({
   },
   isAdmin: (data) => {
     const emailData = emailDataSchema.parse(data);
-    return isAdminEmail(emailData.email);
+    return getInitialAccess(emailData.email).isAdmin;
+  },
+  role: (data) => {
+    const emailData = emailDataSchema.parse(data);
+    return getInitialAccess(emailData.email).role;
   },
 });
 
@@ -54,10 +64,12 @@ export const getGitHubUserFields = defineUserSignupFields({
   isAdmin: (data) => {
     const githubData = githubDataSchema.parse(data);
     const emailInfo = getGithubEmailInfo(githubData);
-    if (!emailInfo.verified) {
-      return false;
-    }
-    return isAdminEmail(emailInfo.email);
+    return getInitialAccess(emailInfo.email, emailInfo.verified).isAdmin;
+  },
+  role: (data) => {
+    const githubData = githubDataSchema.parse(data);
+    const emailInfo = getGithubEmailInfo(githubData);
+    return getInitialAccess(emailInfo.email, emailInfo.verified).role;
   },
 });
 
@@ -93,10 +105,17 @@ export const getGoogleUserFields = defineUserSignupFields({
   },
   isAdmin: (data) => {
     const googleData = googleDataSchema.parse(data);
-    if (!googleData.profile.email_verified) {
-      return false;
-    }
-    return isAdminEmail(googleData.profile.email);
+    return getInitialAccess(
+      googleData.profile.email,
+      googleData.profile.email_verified,
+    ).isAdmin;
+  },
+  role: (data) => {
+    const googleData = googleDataSchema.parse(data);
+    return getInitialAccess(
+      googleData.profile.email,
+      googleData.profile.email_verified,
+    ).role;
   },
 });
 
@@ -131,10 +150,17 @@ export const getDiscordUserFields = defineUserSignupFields({
   },
   isAdmin: (data) => {
     const discordData = discordDataSchema.parse(data);
-    if (!discordData.profile.email || !discordData.profile.verified) {
-      return false;
-    }
-    return isAdminEmail(discordData.profile.email);
+    return getInitialAccess(
+      discordData.profile.email ?? "",
+      Boolean(discordData.profile.email && discordData.profile.verified),
+    ).isAdmin;
+  },
+  role: (data) => {
+    const discordData = discordDataSchema.parse(data);
+    return getInitialAccess(
+      discordData.profile.email ?? "",
+      Boolean(discordData.profile.email && discordData.profile.verified),
+    ).role;
   },
 });
 

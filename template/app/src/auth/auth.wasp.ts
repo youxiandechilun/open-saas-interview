@@ -27,8 +27,9 @@ import {
 
 const emailAuthMethod: NonNullable<AuthMethods["email"]> = {
   fromField: {
-    name: "Open SaaS App",
-    email: "me@example.com",
+    name: process.env.EMAIL_FROM_NAME?.trim() || "MotionPress",
+    email:
+      process.env.EMAIL_FROM_ADDRESS?.trim() || "noreply@motionpress.local",
   },
   emailVerification: {
     clientRoute: "EmailVerificationRoute",
@@ -80,7 +81,7 @@ export const authConfig: Auth = {
     // discord: discordAuthMethod,
   },
   onAuthFailedRedirectTo: "/login",
-  onAuthSucceededRedirectTo: "/demo-app",
+  onAuthSucceededRedirectTo: "/ai-studio",
 };
 
 export const authSpec: Spec = [

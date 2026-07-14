@@ -1,5 +1,5 @@
-import { LogIn, Menu } from "lucide-react";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { Clapperboard, LogIn, Menu } from "lucide-react";
+import { Dispatch, SetStateAction, useState } from "react";
 import { Link as ReactRouterLink } from "react-router";
 import { useAuth } from "wasp/client/auth";
 import { Link as WaspRouterLink, routes } from "wasp/client/router";
@@ -10,17 +10,19 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "../../../client/components/ui/sheet";
-import { throttleWithTrailingInvocation } from "../../../shared/utils";
+import {
+  LocaleToggle,
+  useI18n,
+  type I18nContextValue,
+  type MessageKey,
+} from "../../../i18n";
 import { UserDropdown } from "../../../user/UserDropdown";
 import { UserMenuItems } from "../../../user/UserMenuItems";
-import { useIsLandingPage } from "../../hooks/useIsLandingPage";
-import logo from "../../static/logo.webp";
 import { cn } from "../../utils";
 import { DarkModeSwitcher } from "../DarkModeSwitcher";
-import { Announcement } from "./Announcement";
 
 export interface NavigationItem {
-  name: string;
+  labelKey: MessageKey;
   to: string;
 }
 
@@ -29,112 +31,56 @@ export function NavBar({
 }: {
   navigationItems: NavigationItem[];
 }) {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const isLandingPage = useIsLandingPage();
-
-  useEffect(() => {
-    const throttledHandler = throttleWithTrailingInvocation(() => {
-      setIsScrolled(window.scrollY > 0);
-    }, 50);
-
-    window.addEventListener("scroll", throttledHandler);
-
-    return () => {
-      window.removeEventListener("scroll", throttledHandler);
-      throttledHandler.cancel();
-    };
-  }, []);
+  const { t } = useI18n();
 
   return (
-    <>
-      {isLandingPage && <Announcement />}
-      <header
-        className={cn(
-          "sticky top-0 z-50 transition-all duration-300",
-          isScrolled && "top-4",
-        )}
+    <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm">
+      <nav
+        className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8"
+        aria-label={t("nav.global")}
       >
-        <div
-          className={cn("transition-all duration-300", {
-            "bg-background/90 border-border mx-4 rounded-full border pr-2 shadow-lg backdrop-blur-lg md:mx-20 lg:pr-0":
-              isScrolled,
-            "bg-background/80 border-border mx-0 border-b backdrop-blur-lg":
-              !isScrolled,
-          })}
-        >
-          <nav
-            className={cn(
-              "flex items-center justify-between transition-all duration-300",
-              {
-                "p-3 lg:px-6": isScrolled,
-                "p-6 lg:px-8": !isScrolled,
-              },
-            )}
-            aria-label="Global"
-          >
             <div className="flex items-center gap-6">
               <WaspRouterLink
                 to={routes.LandingPageRoute.to}
                 className="text-foreground hover:text-primary flex items-center transition-colors duration-300 ease-in-out"
               >
-                <NavLogo isScrolled={isScrolled} />
-                <span
-                  className={cn(
-                    "text-foreground font-semibold leading-6 transition-all duration-300",
-                    {
-                      "ml-2 text-sm": !isScrolled,
-                      "ml-2 text-xs": isScrolled,
-                    },
-                  )}
-                >
-                  Your SaaS
+                <NavLogo />
+                <span className="ml-2 text-sm font-bold leading-6 text-foreground">
+                  {t("nav.brand")}
                 </span>
               </WaspRouterLink>
 
               <ul className="ml-4 hidden items-center gap-6 lg:flex">
-                {renderNavigationItems(navigationItems)}
+                {renderNavigationItems(navigationItems, t)}
               </ul>
             </div>
             <NavBarMobileMenu
-              isScrolled={isScrolled}
               navigationItems={navigationItems}
             />
-            <NavBarDesktopUserDropdown isScrolled={isScrolled} />
-          </nav>
-        </div>
-      </header>
-    </>
+            <NavBarDesktopUserDropdown />
+      </nav>
+    </header>
   );
 }
 
-function NavBarDesktopUserDropdown({ isScrolled }: { isScrolled: boolean }) {
+function NavBarDesktopUserDropdown() {
   const { data: user, isLoading: isUserLoading } = useAuth();
+  const { t } = useI18n();
 
   return (
     <div className="hidden items-center justify-end gap-3 lg:flex lg:flex-1">
-      <ul className="flex items-center justify-center gap-2 sm:gap-4">
+      <div className="flex items-center justify-center gap-2 sm:gap-4">
+        <LocaleToggle />
         <DarkModeSwitcher />
-      </ul>
+      </div>
       {isUserLoading ? null : !user ? (
         <WaspRouterLink
           to={routes.LoginRoute.to}
-          className={cn(
-            "ml-3 font-semibold leading-6 transition-all duration-300",
-            {
-              "text-sm": !isScrolled,
-              "text-xs": isScrolled,
-            },
-          )}
+          className="ml-3 text-sm font-semibold leading-6"
         >
           <div className="text-foreground hover:text-primary flex items-center transition-colors duration-300 ease-in-out">
-            Log in{" "}
-            <LogIn
-              size={isScrolled ? "1rem" : "1.1rem"}
-              className={cn("transition-all duration-300", {
-                "ml-1 mt-[0.1rem]": !isScrolled,
-                "ml-1": isScrolled,
-              })}
-            />
+            {t("nav.login")}{" "}
+            <LogIn className="ml-1 size-4" />
           </div>
         </WaspRouterLink>
       ) : (
@@ -147,14 +93,13 @@ function NavBarDesktopUserDropdown({ isScrolled }: { isScrolled: boolean }) {
 }
 
 function NavBarMobileMenu({
-  isScrolled,
   navigationItems,
 }: {
-  isScrolled: boolean;
   navigationItems: NavigationItem[];
 }) {
   const { data: user, isLoading: isUserLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <div className="flex lg:hidden">
@@ -162,39 +107,31 @@ function NavBarMobileMenu({
         <SheetTrigger asChild>
           <button
             type="button"
-            className={cn(
-              "text-muted-foreground hover:text-muted hover:bg-accent inline-flex items-center justify-center rounded-md transition-colors",
-            )}
+            className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="sr-only">Open main menu</span>
-            <Menu
-              className={cn("transition-all duration-300", {
-                "size-8 p-1": !isScrolled,
-                "size-6 p-0.5": isScrolled,
-              })}
-              aria-hidden="true"
-            />
+            <span className="sr-only">{t("nav.openMenu")}</span>
+            <Menu className="size-5" aria-hidden="true" />
           </button>
         </SheetTrigger>
         <SheetContent side="right" className="w-[300px] sm:w-[400px]">
           <SheetHeader>
             <SheetTitle className="flex items-center">
               <WaspRouterLink to={routes.LandingPageRoute.to}>
-                <span className="sr-only">Your SaaS</span>
-                <NavLogo isScrolled={false} />
+                <span className="sr-only">{t("nav.brand")}</span>
+                <NavLogo />
               </WaspRouterLink>
             </SheetTitle>
           </SheetHeader>
           <div className="mt-6 flow-root">
             <div className="divide-border -my-6 divide-y">
               <ul className="space-y-2 py-6">
-                {renderNavigationItems(navigationItems, setMobileMenuOpen)}
+                {renderNavigationItems(navigationItems, t, setMobileMenuOpen)}
               </ul>
               <div className="py-6">
                 {isUserLoading ? null : !user ? (
                   <WaspRouterLink to={routes.LoginRoute.to}>
                     <div className="text-foreground hover:text-primary flex items-center justify-end transition-colors duration-300 ease-in-out">
-                      Log in <LogIn size="1.1rem" className="ml-1" />
+                      {t("nav.login")} <LogIn size="1.1rem" className="ml-1" />
                     </div>
                   </WaspRouterLink>
                 ) : (
@@ -206,7 +143,8 @@ function NavBarMobileMenu({
                   </ul>
                 )}
               </div>
-              <div className="py-6">
+              <div className="flex items-center justify-end gap-4 py-6">
+                <LocaleToggle />
                 <DarkModeSwitcher />
               </div>
             </div>
@@ -219,6 +157,7 @@ function NavBarMobileMenu({
 
 function renderNavigationItems(
   navigationItems: NavigationItem[],
+  t: I18nContextValue["t"],
   setMobileMenuOpen?: Dispatch<SetStateAction<boolean>>,
 ) {
   const menuStyles = cn({
@@ -230,29 +169,30 @@ function renderNavigationItems(
 
   return navigationItems.map((item) => {
     return (
-      <li key={item.name}>
+      <li key={item.labelKey}>
         <ReactRouterLink
           to={item.to}
           className={menuStyles}
           onClick={setMobileMenuOpen && (() => setMobileMenuOpen(false))}
           target={item.to.startsWith("http") ? "_blank" : undefined}
         >
-          {item.name}
+          {t(item.labelKey)}
         </ReactRouterLink>
       </li>
     );
   });
 }
 
-function NavLogo({ isScrolled }: { isScrolled: boolean }) {
+function NavLogo() {
+  const { t } = useI18n();
+
   return (
-    <img
-      className={cn("transition-all duration-500", {
-        "size-8": !isScrolled,
-        "size-7": isScrolled,
-      })}
-      src={logo}
-      alt="Your SaaS App"
-    />
+    <span
+      className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground"
+      role="img"
+      aria-label={t("nav.logoAlt")}
+    >
+      <Clapperboard className="size-5" aria-hidden="true" />
+    </span>
   );
 }

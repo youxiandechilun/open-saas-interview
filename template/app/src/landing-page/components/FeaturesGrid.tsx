@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "../../client/components/ui/card";
 import { cn } from "../../client/utils";
+import { useI18n } from "../../i18n";
 import { Feature } from "./Features";
 import { SectionTitle } from "./SectionTitle";
 
@@ -24,18 +25,20 @@ interface FeaturesGridProps {
 }
 
 export function FeaturesGrid({ features, className = "" }: FeaturesGridProps) {
+  const { t } = useI18n();
+
   return (
     <div
-      className="mx-auto my-16 flex max-w-7xl flex-col gap-4 md:my-24 lg:my-40"
+      className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-20 sm:py-24 lg:px-8"
       id="features"
     >
       <SectionTitle
-        title="Features"
-        description="These are some of the features of the product."
+        title={t("landing.features.title")}
+        description={t("landing.features.description")}
       />
       <div
         className={cn(
-          "mx-4 grid auto-rows-[minmax(140px,auto)] grid-cols-2 gap-4 md:mx-6 md:grid-cols-4 lg:mx-8 lg:grid-cols-6",
+          "mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
           className,
         )}
       >
@@ -62,9 +65,9 @@ function FeaturesGridItem({
   fullWidthIcon = true,
 }: GridFeature) {
   const gridFeatureSizeToClasses: Record<GridFeature["size"], string> = {
-    small: "col-span-1",
-    medium: "col-span-2 md:col-span-2 lg:col-span-2",
-    large: "col-span-2 md:col-span-2 lg:col-span-2 row-span-2",
+    small: "",
+    medium: "",
+    large: "",
   };
 
   const directionToClass: Record<
@@ -80,18 +83,18 @@ function FeaturesGridItem({
   const gridFeatureCard = (
     <Card
       className={cn(
-        "h-full min-h-[140px] cursor-pointer transition-all duration-300 hover:shadow-lg",
+        "h-full min-h-48 bg-card transition-colors hover:border-primary/40",
         gridFeatureSizeToClasses[size],
       )}
-      variant="bento"
+      variant="default"
     >
-      <CardContent className="flex h-full flex-col items-center justify-center p-4">
+      <CardContent className="flex h-full flex-col items-start justify-start p-6">
         {fullWidthIcon && (icon || emoji) ? (
-          <div className="mb-3 flex w-full items-center justify-center">
+          <div className="mb-5 flex w-full items-center justify-start text-primary">
             {icon ? (
               icon
             ) : emoji ? (
-              <span className="text-4xl">{emoji}</span>
+              <span className="text-3xl">{emoji}</span>
             ) : null}
           </div>
         ) : (
@@ -104,7 +107,7 @@ function FeaturesGridItem({
                 : "justify-start",
             )}
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-primary">
               {icon ? (
                 icon
               ) : emoji ? (
@@ -119,13 +122,13 @@ function FeaturesGridItem({
           </div>
         )}
         {fullWidthIcon && (icon || emoji) && (
-          <CardTitle className="mb-2 text-center">{name}</CardTitle>
+          <CardTitle className="mb-2 text-left text-base leading-6">{name}</CardTitle>
         )}
         <CardDescription
           className={cn(
-            "text-xs leading-relaxed",
+            "text-sm leading-6",
             fullWidthIcon || direction === "col" || align === "center"
-              ? "text-center"
+              ? "text-left"
               : "text-left",
           )}
         >
@@ -139,8 +142,8 @@ function FeaturesGridItem({
     return (
       <a
         href={href}
-        target="_blank"
-        rel="noopener noreferrer"
+        target={href.startsWith("http") ? "_blank" : undefined}
+        rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
         className={gridFeatureSizeToClasses[size]}
       >
         {gridFeatureCard}

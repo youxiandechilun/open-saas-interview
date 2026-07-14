@@ -14,10 +14,12 @@ const [robots, sitemapIndex, sitemap, manifest] = await Promise.all([
 ]);
 
 assert.match(robots, /^User-agent: \*/m);
-assert.match(robots, /Sitemap: https:\/\/[^\s]+\/sitemap-index\.xml/);
+assert.match(robots, /Sitemap: https?:\/\/[^\s]+\/sitemap-index\.xml/);
 assert.match(sitemapIndex, /<sitemapindex/);
 assert.equal(
-  manifest.posts.some((post) => post.route === "/blog/2023-11-23-post/"),
+  manifest.posts.some(
+    (post) => post.route === "/blog/ai-animation-publishing-workflow/",
+  ),
   true,
 );
 
@@ -38,6 +40,17 @@ for (const post of manifest.posts) {
     true,
     `${post.route} canonical must match the SEO manifest`,
   );
+  for (const [label, pattern] of [
+    ["og:type", /<meta\b[^>]*property="og:type"[^>]*>/g],
+    ["og:image", /<meta\b[^>]*property="og:image"[^>]*>/g],
+    ["twitter:card", /<meta\b[^>]*name="twitter:card"[^>]*>/g],
+  ]) {
+    assert.equal(
+      (postHtml.match(pattern) ?? []).length,
+      1,
+      `${post.route} must render exactly one ${label} tag`,
+    );
+  }
   assert.equal(
     sitemap.includes(`<loc>${post.canonical}</loc>`),
     true,

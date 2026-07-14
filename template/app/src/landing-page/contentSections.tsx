@@ -1,166 +1,91 @@
-import daBoiAvatar from "../client/static/da-boi.webp";
-import kivo from "../client/static/examples/kivo.webp";
-import messync from "../client/static/examples/messync.webp";
-import microinfluencerClub from "../client/static/examples/microinfluencers.webp";
-import promptpanda from "../client/static/examples/promptpanda.webp";
-import reviewradar from "../client/static/examples/reviewradar.webp";
-import scribeist from "../client/static/examples/scribeist.webp";
-import searchcraft from "../client/static/examples/searchcraft.webp";
-import { BlogUrl, DocsUrl } from "../shared/common";
+import {
+  FileCode2,
+  Film,
+  Gauge,
+  LibraryBig,
+  ListTodo,
+  SearchCheck,
+  ShieldCheck,
+  Sparkles,
+  WandSparkles,
+} from "lucide-react";
+import { BlogUrl } from "../shared/common";
 import type { GridFeature } from "./components/FeaturesGrid";
 
 export const features: GridFeature[] = [
   {
-    name: "Cool Feature 1",
-    description: "Your feature",
-    emoji: "🤝",
-    href: DocsUrl,
-    size: "small",
-  },
-  {
-    name: "Cool Feature 2",
-    description: "Feature description",
-    emoji: "🔐",
-    href: DocsUrl,
-    size: "small",
-  },
-  {
-    name: "Cool Feature 3",
-    description: "Describe your cool feature here",
-    emoji: "🥞",
-    href: DocsUrl,
+    name: "Prompt optimization",
+    description: "Rewrite and score prompts before generation.",
+    icon: <WandSparkles className="size-7" aria-hidden="true" />,
+    href: "/ai-studio",
     size: "medium",
   },
   {
-    name: "Cool Feature 4",
-    description: "Describe your cool feature here",
-    emoji: "💸",
-    href: DocsUrl,
-    size: "large",
-  },
-  {
-    name: "Cool Feature 5",
-    description: "Describe your cool feature here",
-    emoji: "💼",
-    href: DocsUrl,
-    size: "large",
-  },
-  {
-    name: "Cool Feature 6",
-    description: "It is cool",
-    emoji: "📈",
-    href: DocsUrl,
-    size: "small",
-  },
-  {
-    name: "Cool Feature 7",
-    description: "Cool feature",
-    emoji: "📧",
-    href: DocsUrl,
-    size: "small",
-  },
-  {
-    name: "Cool Feature 8",
-    description: "Describe your cool feature here",
-    emoji: "🤖",
-    href: DocsUrl,
+    name: "HTML animation generation",
+    description: "Generate safe, previewable HTML animation.",
+    icon: <FileCode2 className="size-7" aria-hidden="true" />,
+    href: "/ai-studio",
     size: "medium",
   },
   {
-    name: "Cool Feature 9",
-    description: "Describe your cool feature here",
-    emoji: "🚀",
-    href: DocsUrl,
+    name: "Asset library",
+    description: "Save generated work and reuse it in content.",
+    icon: <LibraryBig className="size-7" aria-hidden="true" />,
+    href: "/ai-studio",
     size: "medium",
   },
-];
-
-export const testimonials = [
   {
-    name: "Da Boi",
-    role: "Wasp Mascot",
-    avatarSrc: daBoiAvatar,
-    socialUrl: "https://twitter.com/wasplang",
-    quote: "I don't even know how to code. I'm just a plushie.",
+    name: "Video rendering",
+    description: "Render animation jobs to MP4 or WebM.",
+    icon: <Film className="size-7" aria-hidden="true" />,
+    href: "/ai-studio",
+    size: "medium",
   },
   {
-    name: "Mr. Foobar",
-    role: "Founder @ Cool Startup",
-    avatarSrc: daBoiAvatar,
-    socialUrl: "",
-    quote: "This product makes me cooler than I already am.",
+    name: "Content workspace",
+    description: "Manage posts, authors, tags, slugs, and status.",
+    icon: <ListTodo className="size-7" aria-hidden="true" />,
+    href: "/admin/content",
+    size: "medium",
   },
   {
-    name: "Jamie",
-    role: "Happy Customer",
-    avatarSrc: daBoiAvatar,
-    socialUrl: "#",
-    quote: "My cats love it!",
+    name: "Publishing pipeline",
+    description: "Track every publish and rebuild task to completion.",
+    icon: <Sparkles className="size-7" aria-hidden="true" />,
+    href: "/admin/content",
+    size: "medium",
   },
-];
-
-export const faqs = [
   {
-    id: 1,
-    question: "Whats the meaning of life?",
-    answer: "42.",
-    href: "https://en.wikipedia.org/wiki/42_(number)",
+    name: "Roles and permissions",
+    description: "Keep admin, editor, and creator access explicit.",
+    icon: <ShieldCheck className="size-7" aria-hidden="true" />,
+    href: "/admin/users",
+    size: "medium",
+  },
+  {
+    name: "Usage and cost controls",
+    description: "Enforce quotas and inspect model usage logs.",
+    icon: <Gauge className="size-7" aria-hidden="true" />,
+    href: "/admin",
+    size: "medium",
+  },
+  {
+    name: "SEO quality gate",
+    description: "Check metadata, headings, alt text, and links.",
+    icon: <SearchCheck className="size-7" aria-hidden="true" />,
+    href: "/admin/content",
+    size: "medium",
   },
 ];
 
 export const footerNavigation = {
   app: [
-    { name: "Documentation", href: DocsUrl },
+    { name: "AI Studio", href: "/ai-studio" },
     { name: "Blog", href: BlogUrl },
   ],
   company: [
-    { name: "About", href: "https://wasp.sh" },
-    { name: "Privacy", href: "#" },
-    { name: "Terms of Service", href: "#" },
+    { name: "Features", href: "/#features" },
+    { name: "Sign in", href: "/login" },
+    { name: "Account", href: "/account" },
   ],
 };
-
-export const examples = [
-  {
-    name: "Example #1",
-    description: "Describe your example here.",
-    imageSrc: kivo,
-    href: "#",
-  },
-  {
-    name: "Example #2",
-    description: "Describe your example here.",
-    imageSrc: messync,
-    href: "#",
-  },
-  {
-    name: "Example #3",
-    description: "Describe your example here.",
-    imageSrc: microinfluencerClub,
-    href: "#",
-  },
-  {
-    name: "Example #4",
-    description: "Describe your example here.",
-    imageSrc: promptpanda,
-    href: "#",
-  },
-  {
-    name: "Example #5",
-    description: "Describe your example here.",
-    imageSrc: reviewradar,
-    href: "#",
-  },
-  {
-    name: "Example #6",
-    description: "Describe your example here.",
-    imageSrc: scribeist,
-    href: "#",
-  },
-  {
-    name: "Example #7",
-    description: "Describe your example here.",
-    imageSrc: searchcraft,
-    href: "#",
-  },
-];

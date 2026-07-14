@@ -1,5 +1,9 @@
 import { env } from "wasp/server";
 import { type DispatchCmsPublicationEventsJob } from "wasp/server/jobs";
+import {
+  CMS_PUBLICATION_DISABLED_MESSAGE,
+  getPublicationWebhookConfig,
+} from "./publicationPolicy";
 
 const MAX_PUBLICATION_ATTEMPTS = 5;
 const PUBLICATION_BATCH_SIZE = 20;
@@ -8,7 +12,20 @@ export const dispatchCmsPublicationEventsJob: DispatchCmsPublicationEventsJob<
   never,
   void
 > = async (_args, context) => {
-  if (!env.CMS_REBUILD_WEBHOOK_URL) return;
+  const webhook = getPublicationWebhookConfig(
+    env.CMS_REBUILD_WEBHOOK_URL,
+    env.CMS_REBUILD_WEBHOOK_TOKEN,
+  );
+  if (!webhook) {
+    await context.entities.CmsPublicationEvent.updateMany({
+      where: { status: { in: ["PENDING", "PROCESSING"] } },
+      data: {
+        status: "DISABLED",
+        lastError: CMS_PUBLICATION_DISABLED_MESSAGE,
+      },
+    });
+    return;
+  }
 
   const now = new Date();
   const staleBefore = new Date(now.getTime() - 5 * 60_000);
@@ -54,14 +71,12 @@ export const dispatchCmsPublicationEventsJob: DispatchCmsPublicationEventsJob<
     if (claimed.count === 0) continue;
 
     try {
-      const response = await fetch(env.CMS_REBUILD_WEBHOOK_URL, {
+      const response = await fetch(webhook.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": event.id,
-          ...(env.CMS_REBUILD_WEBHOOK_TOKEN && {
-            Authorization: `Bearer ${env.CMS_REBUILD_WEBHOOK_TOKEN}`,
-          }),
+          Authorization: `Bearer ${webhook.token}`,
         },
         body: JSON.stringify({
           eventId: event.id,

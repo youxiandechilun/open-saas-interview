@@ -34,6 +34,7 @@ export const cmsPostWriteSchema = z.object({
   status: z.enum(CMS_POST_STATUSES),
   authorId: z.string().trim().min(1),
   tagIds: z.array(z.string().trim().min(1)).max(30).default([]),
+  animationId: z.string().uuid().nullable().optional().default(null),
 });
 
 export const cmsPostUpdateSchema = cmsPostWriteSchema.extend({
@@ -79,7 +80,8 @@ export type CmsIdInput = z.infer<typeof cmsIdSchema>;
 type CmsSeoCandidate = Pick<
   ParsedCmsPostWriteInput,
   "title" | "excerpt" | "content" | "authorId"
-> & { slug: string };
+> &
+  Partial<Pick<ParsedCmsPostWriteInput, "status">> & { slug: string };
 
 export function getCmsSeoReadinessIssues(
   candidate: CmsSeoCandidate,
@@ -151,6 +153,26 @@ export function getCmsSeoReadinessIssues(
     });
   }
 
+  const hasMarkdownH2 = /^\s{0,3}##\s+\S/m.test(content);
+  const hasHtmlH2 = /<h2(?:\s|>)/i.test(content);
+  if (!hasMarkdownH2 && !hasHtmlH2) {
+    issues.push({
+      code: "H2_MISSING",
+      field: "content",
+      message:
+        "Add at least one H2 section heading so readers and search engines can scan the article structure.",
+    });
+  }
+
+  if (!hasInternalContentLink(content)) {
+    issues.push({
+      code: "INTERNAL_LINK_MISSING",
+      field: "content",
+      message:
+        "Add at least one relevant internal link to another MotionPress page or article.",
+    });
+  }
+
   const hasEmptyMarkdownAlt = /!\[\s*\]\([^)]+\)/.test(content);
   const hasHtmlImageWithoutAlt = /<img\b(?![^>]*\s+alt\s*=)[^>]*>/i.test(
     content,
@@ -167,4 +189,26 @@ export function getCmsSeoReadinessIssues(
   }
 
   return issues;
+}
+
+function hasInternalContentLink(content: string): boolean {
+  const hrefs: string[] = [];
+  const markdownLinkPattern =
+    /(?<!!)\[[^\]\n]+\]\(\s*<?([^\s)>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g;
+  const htmlLinkPattern = /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>/gi;
+
+  for (const match of content.matchAll(markdownLinkPattern)) {
+    hrefs.push(match[1]);
+  }
+  for (const match of content.matchAll(htmlLinkPattern)) {
+    hrefs.push(match[1]);
+  }
+
+  return hrefs.some((rawHref) => {
+    const href = rawHref.trim();
+    if (!href || href.startsWith("//")) return false;
+    if (href.startsWith("/") || href.startsWith("./")) return true;
+    if (href.startsWith("../") || href.startsWith("#")) return true;
+    return !/^[a-z][a-z\d+.-]*:/i.test(href);
+  });
 }

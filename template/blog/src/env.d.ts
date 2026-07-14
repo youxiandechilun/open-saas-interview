@@ -1,2 +1,3 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="../.astro/types.d.ts" />
 import "astro/client";
-import "../.astro/types.d.ts";

@@ -1,3 +1,66 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --sl-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --sl-color-accent-low: #dceaf7;
+  --sl-color-accent: #0b5cad;
+  --sl-color-accent-high: #063665;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #17212b;
+  --sl-color-gray-2: #334252;
+  --sl-color-gray-3: #526273;
+  --sl-color-gray-4: #748394;
+  --sl-color-gray-5: #d0d8e0;
+  --sl-color-gray-6: #e9eef2;
+  --sl-color-black: #f6f8fa;
+  --sl-color-bg: #f6f8fa;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #ffffff;
+  --sl-color-hairline-light: #d0d8e0;
+  --sl-color-hairline: #d0d8e0;
+  --sl-color-text: #17212b;
+  --sl-color-text-accent: #0b5cad;
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #1d344a;
+  --sl-color-accent: #69a9e5;
+  --sl-color-accent-high: #d7e9fa;
+  --sl-color-white: #f3f5f7;
+  --sl-color-gray-1: #e9eef2;
+  --sl-color-gray-2: #c8d0d8;
+  --sl-color-gray-3: #a7b1bb;
+  --sl-color-gray-4: #78838e;
+  --sl-color-gray-5: #3b444d;
+  --sl-color-gray-6: #242a30;
+  --sl-color-black: #15191d;
+  --sl-color-bg: #15191d;
+  --sl-color-bg-nav: #191e23;
+  --sl-color-bg-sidebar: #191e23;
+  --sl-color-text: #f3f5f7;
+  --sl-color-text-accent: #69a9e5;
+}
+
+body,
+button,
+input,
+textarea {
+  letter-spacing: 0;
+}
+
+.sl-markdown-content a:not([class]) {
+  text-underline-offset: 0.2em;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  letter-spacing: 0;
+}
+
+.card,
+.pagination-links a {
+  border-radius: 0.5rem;
+  box-shadow: none;
+}

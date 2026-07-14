@@ -23,6 +23,7 @@ describe.skipIf(process.env.RUN_VIDEO_INTEGRATION !== "1")(
           format,
           userId: "test-user",
           animationId: `test-animation-${format}`,
+          renderAttemptId: `test-attempt-${format}`,
         });
         expect(result.mimeType).toBe(`video/${format}`);
         expect((await stat(result.storagePath)).size).toBeGreaterThan(1_000);

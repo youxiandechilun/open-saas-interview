@@ -1,7 +1,6 @@
-import { access } from "node:fs/promises";
 import path from "node:path";
 import type { DownloadAiAnimationVideo } from "wasp/server/api";
-import { isPathInsideVideoStorage } from "./videoRenderer";
+import { validateSucceededVideoAsset } from "./videoAsset";
 
 export const downloadAiAnimationVideo: DownloadAiAnimationVideo = async (
   req,
@@ -10,6 +9,9 @@ export const downloadAiAnimationVideo: DownloadAiAnimationVideo = async (
 ) => {
   if (!context.user)
     return res.status(401).json({ message: "Authentication required" });
+  if (context.user.isDisabled) {
+    return res.status(403).json({ message: "This account is disabled" });
+  }
   const animationId = String(req.params.id ?? "");
   const animation = await context.entities.AiAnimation.findFirst({
     where: {
@@ -18,16 +20,15 @@ export const downloadAiAnimationVideo: DownloadAiAnimationVideo = async (
       videoStatus: "SUCCEEDED",
     },
   });
-  if (
-    !animation?.videoStoragePath ||
-    !isPathInsideVideoStorage(animation.videoStoragePath)
-  ) {
+  if (!animation) {
     return res.status(404).json({ message: "Video not found" });
   }
 
-  try {
-    await access(animation.videoStoragePath);
-  } catch {
+  const storedVideo = await validateSucceededVideoAsset({
+    asset: animation,
+    invalidate: (cas) => context.entities.AiAnimation.updateMany(cas),
+  });
+  if (storedVideo.state !== "valid") {
     return res.status(404).json({ message: "Video file is unavailable" });
   }
 
@@ -35,7 +36,7 @@ export const downloadAiAnimationVideo: DownloadAiAnimationVideo = async (
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   return res.download(
-    animation.videoStoragePath,
+    storedVideo.asset.resolvedPath,
     `${safeFilename(animation.title)}.${extension}`,
   );
 };

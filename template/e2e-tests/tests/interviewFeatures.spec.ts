@@ -1,14 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createRandomUser, logUserIn, signUserUp } from "./utils";
+import { createRandomUser, signUserUp } from "./utils";
 
 test.describe("technical SEO", () => {
-  test("landing and pricing publish route-specific metadata", async ({
+  test("landing publishes social metadata and auth pages stay private", async ({
     page,
   }) => {
     await page.goto("/");
+    const siteOrigin = new URL(page.url()).origin;
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
-      "https://your-saas-app.com/",
+      `${siteOrigin}/`,
     );
     await expect(page.locator('meta[property="og:type"]')).toHaveAttribute(
       "content",
@@ -19,32 +20,32 @@ test.describe("technical SEO", () => {
       "summary_large_image",
     );
 
-    await page.goto("/pricing");
+    await page.goto("/login");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
-      "https://your-saas-app.com/pricing",
+      `${siteOrigin}/login`,
     );
-    await expect(page.locator('meta[property="og:type"]')).toHaveAttribute(
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       "content",
-      "product",
+      "noindex, nofollow, noarchive",
     );
-    await expect(
-      page.locator('script[type="application/ld+json"]'),
-    ).toContainText('"@type":"OfferCatalog"');
   });
 
   test("public CMS feed is available without a session", async ({
     request,
   }) => {
-    const response = await request.get("/content-cms/published");
+    const serverOrigin = process.env.WASP_SERVER_URL ?? "http://localhost:3001";
+    const response = await request.get(`${serverOrigin}/content-cms/published`);
     expect(response.ok()).toBeTruthy();
     const feed = await response.json();
     expect(feed).toEqual(
       expect.objectContaining({
         contentVersion: expect.any(String),
-        updatedAt: expect.any(String),
         posts: expect.any(Array),
       }),
+    );
+    expect(feed.updatedAt === null || typeof feed.updatedAt === "string").toBe(
+      true,
     );
   });
 });
@@ -58,7 +59,6 @@ test.describe("authenticated feature routes", () => {
     page = await browser.newPage();
     const user = createRandomUser();
     await signUserUp({ page, user });
-    await logUserIn({ page, user });
   });
 
   test.afterAll(async () => {
@@ -76,11 +76,18 @@ test.describe("authenticated feature routes", () => {
     );
     await expect(page.getByLabel("Animation prompt")).toBeVisible();
     await expect(page.getByRole("button", { name: "Optimize" })).toBeDisabled();
+
+    await page.getByRole("button", { name: "Chinese" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+    await expect(
+      page.getByRole("heading", { name: "AI 动画工作室" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("动画描述")).toBeVisible();
   });
 
   test("non-admin users cannot open the CMS console", async () => {
     await page.goto("/admin/content");
-    await page.waitForURL("**/");
-    await expect(page).toHaveURL(/\/$/);
+    await page.waitForURL("**/admin");
+    await expect(page).toHaveURL(/\/admin$/);
   });
 });

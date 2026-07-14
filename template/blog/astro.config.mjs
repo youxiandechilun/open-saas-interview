@@ -2,85 +2,70 @@ import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightBlog from "starlight-blog";
 import { SITE_URL } from "./src/lib/site.mjs";
+import { motionpressMarkdownRehypePlugins } from "./src/lib/markdownSecurity.mjs";
 
 import tailwind from "@astrojs/tailwind";
 
 // https://astro.build/config
 export default defineConfig({
   site: SITE_URL,
-  trailingSlash: "always",
+  markdown: {
+    rehypePlugins: motionpressMarkdownRehypePlugins,
+  },
+  // Keep both /blog and /blog/ usable when the blog is opened directly in dev.
+  trailingSlash: "ignore",
   integrations: [
     starlight({
-      title: "Your SaaS",
+      title: "MotionPress Journal",
       customCss: ["./src/styles/tailwind.css"],
-      description: "Documentation for your SaaS.",
-      logo: {
-        src: "/src/assets/logo.webp",
-        alt: "Your SaaS",
-      },
+      description:
+        "Practical guides for AI animation, video rendering, content operations, and search-ready publishing.",
       head: [
-        // Add your script tags here. Below is an example for Google analytics, etc.
         {
-          tag: "script",
+          tag: "link",
           attrs: {
-            src: "https://www.googletagmanager.com/gtag/js?id=<YOUR-GOOGLE-ANALYTICS-ID>",
+            rel: "icon",
+            type: "image/png",
+            href: "/favicon.png",
           },
         },
         {
-          tag: "script",
-          content: `
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-        
-          gtag('config', '<YOUR-GOOGLE-ANALYTICS-ID>');
-          `,
+          tag: "meta",
+          attrs: {
+            name: "theme-color",
+            content: "#f6f8fa",
+          },
         },
       ],
-      editLink: {
-        baseUrl: "https://github.com/<your-repo>",
-      },
       components: {
         SiteTitle: "./src/components/MyHeader.astro",
-        ThemeSelect: "./src/components/MyThemeSelect.astro",
         Head: "./src/components/HeadWithOGImage.astro",
         PageTitle: "./src/components/TitleWithBannerImage.astro",
       },
-      social: {
-        github: "https://github.com/wasp-lang/open-saas",
-        twitter: "https://twitter.com/wasplang",
-        discord: "https://discord.gg/aCamt5wCpS",
-      },
       sidebar: [
         {
-          label: "Start Here",
+          label: "MotionPress",
           items: [
             {
-              label: "Introduction",
+              label: "Journal home",
               link: "/",
             },
-          ],
-        },
-        {
-          label: "Guides",
-          items: [
             {
-              label: "Example Guide",
-              link: "/guides/example/",
+              label: "Publishing workflow",
+              link: "/guides/publishing-workflow/",
             },
           ],
         },
       ],
       plugins: [
         starlightBlog({
-          title: "Blog",
+          title: "Articles",
           customCss: ["./src/styles/tailwind.css"],
           authors: {
-            Dev: {
-              name: "Dev",
-              title: "Dev @ Your SaaS",
-              picture: "/CRAIG_ROCK.png", // Images in the `public` directory are supported.
-              url: "https://your-site.com",
+            MotionPress: {
+              name: "MotionPress Editorial",
+              title: "Content operations team",
+              url: SITE_URL,
             },
           },
         }),

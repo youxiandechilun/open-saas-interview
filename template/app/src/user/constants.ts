@@ -1,26 +1,70 @@
-import { LayoutDashboard, Settings, Shield } from "lucide-react";
+import {
+  FileText,
+  KeyRound,
+  type LucideIcon,
+  Settings,
+  Shield,
+  Sparkles,
+} from "lucide-react";
 import { routes } from "wasp/client/router";
+import type { MessageKey } from "../i18n";
+import {
+  hasActiveAdminAccess,
+  hasActivePublishingAccess,
+} from "./accessPolicy";
+
+type UserMenuItem = {
+  labelKey: MessageKey;
+  to: string;
+  icon: LucideIcon;
+  access: "authenticated" | "publishing" | "admin";
+};
+
+type MenuUser = {
+  role?: "ADMIN" | "EDITOR" | "CREATOR";
+  isAdmin?: boolean;
+  isDisabled?: boolean;
+};
 
 export const userMenuItems = [
   {
-    name: "AI Scheduler (Demo App)",
-    to: routes.DemoAppRoute.to,
-    icon: LayoutDashboard,
-    isAdminOnly: false,
-    isAuthRequired: true,
+    labelKey: "nav.aiStudio",
+    to: routes.AiStudioRoute.to,
+    icon: Sparkles,
+    access: "authenticated",
   },
   {
-    name: "Account Settings",
+    labelKey: "menu.accountSettings",
     to: routes.AccountRoute.to,
     icon: Settings,
-    isAuthRequired: false,
-    isAdminOnly: false,
+    access: "authenticated",
   },
   {
-    name: "Admin Dashboard",
+    labelKey: "menu.contentCms",
+    to: routes.ContentCmsAdminRoute.to,
+    icon: FileText,
+    access: "publishing",
+  },
+  {
+    labelKey: "menu.aiProvider",
+    to: routes.AiProviderSettingsRoute.to,
+    icon: KeyRound,
+    access: "admin",
+  },
+  {
+    labelKey: "menu.adminDashboard",
     to: routes.AdminRoute.to,
     icon: Shield,
-    isAuthRequired: false,
-    isAdminOnly: true,
+    access: "admin",
   },
-] as const;
+] as const satisfies readonly UserMenuItem[];
+
+export function canViewUserMenuItem(
+  item: UserMenuItem,
+  user: MenuUser | undefined,
+): boolean {
+  if (!user || user.isDisabled) return false;
+  if (item.access === "authenticated") return true;
+  if (item.access === "admin") return hasActiveAdminAccess(user);
+  return hasActivePublishingAccess(user);
+}

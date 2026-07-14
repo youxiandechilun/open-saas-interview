@@ -1,281 +1,261 @@
 import {
-  Calendar,
-  ChevronDown,
-  ChevronUp,
+  Blocks,
+  ChartNoAxesCombined,
+  CircleDollarSign,
   FileText,
+  KeyRound,
   LayoutDashboard,
-  LayoutTemplate,
-  Settings,
-  Sheet,
+  Sparkles,
+  Users,
   X,
 } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, type ComponentType } from "react";
 import { NavLink, useLocation } from "react-router";
+import { type AuthUser } from "wasp/auth";
 import { Link, routes } from "wasp/client/router";
-import Logo from "../../client/static/logo.webp";
+import {
+  getWorkspaceRole,
+  hasAdminAccess,
+  hasPublishingAccess,
+} from "../../client/components/workspace/permissions";
 import { cn } from "../../client/utils";
-import { SidebarLinkGroup } from "./SidebarLinkGroup";
+import { useI18n } from "../../i18n";
 
-interface SidebarProps {
+type SidebarProps = {
+  user: AuthUser;
   sidebarOpen: boolean;
-  setSidebarOpen: (arg: boolean) => void;
-}
+  setSidebarOpen: (open: boolean) => void;
+};
 
-export function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
+type NavigationItem = {
+  label: string;
+  to: string;
+  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  exact?: boolean;
+};
+
+const copy = {
+  en: {
+    close: "Close navigation",
+    workspace: "Workspace",
+    administration: "Administration",
+    overview: "Overview",
+    animation: "Animation Studio",
+    publishing: "Articles & Publishing",
+    tasks: "Task Center",
+    users: "Users & Roles",
+    usage: "Usage & Cost",
+    integrations: "AI Service Configuration",
+    product: "MotionPress",
+    environment: "Production workspace",
+  },
+  "zh-CN": {
+    close: "关闭导航",
+    workspace: "工作台",
+    administration: "系统管理",
+    overview: "运营概览",
+    animation: "动画工作室",
+    publishing: "文章与发布",
+    tasks: "任务中心",
+    users: "用户与角色",
+    usage: "用量与成本",
+    integrations: "AI 服务配置",
+    product: "MotionPress",
+    environment: "内容生产工作台",
+  },
+} as const;
+
+export function Sidebar({ user, sidebarOpen, setSidebarOpen }: SidebarProps) {
+  const { locale } = useI18n();
+  const labels = copy[locale];
   const location = useLocation();
-  const { pathname } = location;
+  const isAdmin = hasAdminAccess(user);
+  const canPublish = hasPublishingAccess(user);
 
-  const trigger = useRef<HTMLButtonElement>(null);
-  const sidebar = useRef<HTMLElement>(null);
-
-  const storedSidebarExpanded = localStorage.getItem("sidebar-expanded");
-  const [sidebarExpanded, setSidebarExpanded] = useState(
-    storedSidebarExpanded === null ? false : storedSidebarExpanded === "true",
-  );
-
-  // close on click outside
   useEffect(() => {
-    const clickHandler = ({ target }: PointerEvent) => {
-      if (!sidebar.current || !trigger.current) return;
-      if (
-        !sidebarOpen ||
-        sidebar.current.contains(target as Node) ||
-        trigger.current.contains(target as Node)
-      )
-        return;
-      setSidebarOpen(false);
+    setSidebarOpen(false);
+  }, [location.pathname, location.hash, setSidebarOpen]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
     };
-    document.addEventListener("click", clickHandler);
-    return () => document.removeEventListener("click", clickHandler);
-  });
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [setSidebarOpen, sidebarOpen]);
 
-  // close if the esc key is pressed
-  useEffect(() => {
-    const keyHandler = ({ keyCode }: KeyboardEvent) => {
-      if (!sidebarOpen || keyCode !== 27) return;
-      setSidebarOpen(false);
-    };
-    document.addEventListener("keydown", keyHandler);
-    return () => document.removeEventListener("keydown", keyHandler);
-  });
+  const workspaceItems: NavigationItem[] = [
+    {
+      label: labels.overview,
+      to: routes.AdminRoute.to,
+      icon: LayoutDashboard,
+      exact: true,
+    },
+    {
+      label: labels.animation,
+      to: routes.AiStudioRoute.to,
+      icon: Sparkles,
+      exact: true,
+    },
+    ...(canPublish
+      ? [
+          {
+            label: labels.publishing,
+            to: routes.ContentCmsAdminRoute.to,
+            icon: FileText,
+            exact: true,
+          },
+        ]
+      : []),
+    {
+      label: labels.tasks,
+      to: `${routes.AdminRoute.to}#task-center`,
+      icon: Blocks,
+    },
+  ];
 
-  useEffect(() => {
-    localStorage.setItem("sidebar-expanded", sidebarExpanded.toString());
-    if (sidebarExpanded) {
-      document.querySelector("body")?.classList.add("sidebar-expanded");
-    } else {
-      document.querySelector("body")?.classList.remove("sidebar-expanded");
-    }
-  }, [sidebarExpanded]);
+  const administrationItems: NavigationItem[] = isAdmin
+    ? [
+        {
+          label: labels.users,
+          to: routes.AdminUsersRoute.to,
+          icon: Users,
+          exact: true,
+        },
+        {
+          label: labels.usage,
+          to: `${routes.AdminRoute.to}#usage-cost`,
+          icon: CircleDollarSign,
+        },
+        {
+          label: labels.integrations,
+          to: routes.AiProviderSettingsRoute.to,
+          icon: KeyRound,
+          exact: true,
+        },
+      ]
+    : [];
 
   return (
     <aside
-      ref={sidebar}
+      id="workspace-sidebar"
+      aria-label={labels.workspace}
       className={cn(
-        "bg-muted z-9999 w-72.5 absolute left-0 top-0 flex h-screen flex-col overflow-y-hidden border-r duration-300 ease-linear lg:static lg:translate-x-0",
-        {
-          "translate-x-0": sidebarOpen,
-          "-translate-x-full": !sidebarOpen,
-        },
+        "bg-background fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r transition-transform duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full",
       )}
     >
-      {/* <!-- SIDEBAR HEADER --> */}
-      <div className="py-5.5 lg:py-6.5 flex items-center justify-between gap-2 px-6">
-        <Link to={routes.LandingPageRoute.to}>
-          <img src={Logo} alt="Logo" width={50} />
-        </Link>
-
-        <button
-          ref={trigger}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          aria-controls="sidebar"
-          aria-expanded={sidebarOpen}
-          className="block lg:hidden"
+      <div className="flex h-16 items-center gap-3 border-b px-4">
+        <Link
+          to={routes.AdminRoute.to}
+          className="focus-visible:ring-primary flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2"
         >
-          <X />
+          <span className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
+            <ChartNoAxesCombined className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-bold">
+              {labels.product}
+            </span>
+            <span className="text-muted-foreground block truncate text-xs">
+              {labels.environment}
+            </span>
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(false)}
+          aria-label={labels.close}
+          className="hover:bg-muted focus-visible:ring-primary flex h-10 w-10 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 lg:hidden"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
-      {/* <!-- SIDEBAR HEADER --> */}
 
-      <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-        {/* <!-- Sidebar Menu --> */}
-        <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
-          {/* <!-- Menu Group --> */}
-          <div>
-            <h3 className="text-muted-foreground mb-4 ml-4 text-sm font-semibold">
-              MENU
-            </h3>
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
+        <NavigationGroup label={labels.workspace} items={workspaceItems} />
+        {administrationItems.length > 0 && (
+          <NavigationGroup
+            label={labels.administration}
+            items={administrationItems}
+            className="mt-7"
+          />
+        )}
+      </nav>
 
-            <ul className="mb-6 flex flex-col gap-1.5">
-              {/* <!-- Menu Item Dashboard --> */}
-              <NavLink
-                to={routes.AdminRoute.to}
-                end
-                className={({ isActive }) =>
-                  cn(
-                    "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                    {
-                      "bg-accent text-accent-foreground": isActive,
-                    },
-                  )
-                }
-              >
-                <LayoutDashboard />
-                Dashboard
-              </NavLink>
-
-              {/* <!-- Menu Item Dashboard --> */}
-
-              {/* <!-- Menu Item Users --> */}
-              <li>
-                <NavLink
-                  to={routes.AdminUsersRoute.to}
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <Sheet />
-                  Users
-                </NavLink>
-              </li>
-              {/* <!-- Menu Item Users --> */}
-
-              <li>
-                <NavLink
-                  to={routes.ContentCmsAdminRoute.to}
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <FileText />
-                  Content
-                </NavLink>
-              </li>
-
-              {/* <!-- Menu Item Settings --> */}
-              <li>
-                <NavLink
-                  to={routes.AdminSettingsRoute.to}
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <Settings />
-                  Settings
-                </NavLink>
-              </li>
-              {/* <!-- Menu Item Settings --> */}
-            </ul>
-          </div>
-
-          {/* <!-- Others Group --> */}
-          <div>
-            <h3 className="text-muted-foreground mb-4 ml-4 text-sm font-semibold">
-              Extra Components
-            </h3>
-
-            <ul className="mb-6 flex flex-col gap-1.5">
-              {/* <!-- Menu Item Calendar --> */}
-              <li>
-                <NavLink
-                  to={routes.AdminCalendarRoute.to}
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                      {
-                        "bg-accent text-accent-foreground": isActive,
-                      },
-                    )
-                  }
-                >
-                  <Calendar />
-                  Calendar
-                </NavLink>
-              </li>
-              {/* <!-- Menu Item Calendar --> */}
-
-              {/* <!-- Menu Item Ui Elements --> */}
-              <SidebarLinkGroup
-                activeCondition={pathname === "/ui" || pathname.includes("ui")}
-              >
-                {(handleClick, open) => {
-                  return (
-                    <React.Fragment>
-                      <NavLink
-                        to="#"
-                        className={cn(
-                          "text-muted-foreground hover:bg-accent hover:text-accent-foreground group relative flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium duration-300 ease-in-out",
-                          {
-                            "bg-accent text-accent-foreground":
-                              pathname.includes("ui"),
-                          },
-                        )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (sidebarExpanded) {
-                            handleClick();
-                          } else {
-                            setSidebarExpanded(true);
-                          }
-                        }}
-                      >
-                        <LayoutTemplate />
-                        UI Elements
-                        {open ? <ChevronUp /> : <ChevronDown />}
-                      </NavLink>
-                      {/* <!-- Dropdown Menu Start --> */}
-                      <div
-                        className={cn("translate transform overflow-hidden", {
-                          hidden: !open,
-                        })}
-                      >
-                        <ul className="mb-5.5 mt-4 flex flex-col gap-2.5 pl-6">
-                          <li>
-                            <NavLink
-                              to={routes.AdminUIButtonsRoute.to}
-                              end
-                              className={({ isActive }) =>
-                                cn(
-                                  "text-muted-foreground hover:text-accent group relative flex items-center gap-2.5 rounded-md px-4 font-medium duration-300 ease-in-out",
-                                  { "text-accent!": isActive },
-                                )
-                              }
-                            >
-                              Buttons
-                            </NavLink>
-                          </li>
-                        </ul>
-                      </div>
-                      {/* <!-- Dropdown Menu End --> */}
-                    </React.Fragment>
-                  );
-                }}
-              </SidebarLinkGroup>
-              {/* <!-- Menu Item Ui Elements --> */}
-            </ul>
-          </div>
-        </nav>
-        {/* <!-- Sidebar Menu --> */}
+      <div className="border-t p-4">
+        <div className="flex items-center gap-3">
+          <span className="bg-muted text-muted-foreground flex h-9 w-9 items-center justify-center rounded-md text-xs font-bold">
+            {getInitials(user)}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium">
+              {user.email ?? user.username ?? "Workspace member"}
+            </span>
+            <span className="text-muted-foreground block text-xs">
+              {getWorkspaceRole(user)}
+            </span>
+          </span>
+        </div>
       </div>
     </aside>
   );
+}
+
+function NavigationGroup({
+  label,
+  items,
+  className,
+}: {
+  label: string;
+  items: NavigationItem[];
+  className?: string;
+}) {
+  const location = useLocation();
+
+  return (
+    <div className={className}>
+      <p className="text-muted-foreground mb-2 px-3 text-xs font-semibold">
+        {label}
+      </p>
+      <ul className="space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const [pathname, hash] = item.to.split("#");
+          const isAnchorActive =
+            hash !== undefined &&
+            location.pathname === pathname &&
+            location.hash === `#${hash}`;
+          const isRouteActive =
+            hash === undefined &&
+            (pathname !== routes.AdminRoute.to || location.hash.length === 0);
+
+          return (
+            <li key={item.to}>
+              <NavLink
+                to={item.to}
+                end={item.exact}
+                className={({ isActive }) =>
+                  cn(
+                    "text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-primary flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2",
+                    (isAnchorActive || (isRouteActive && isActive)) &&
+                      "bg-primary/10 text-primary",
+                  )
+                }
+              >
+                <Icon className="h-4.5 w-4.5" aria-hidden={true} />
+                <span>{item.label}</span>
+              </NavLink>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function getInitials(user: AuthUser): string {
+  const source = user.email ?? user.username ?? "MP";
+  return source.slice(0, 2).toUpperCase();
 }

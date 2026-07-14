@@ -1,7 +1,7 @@
 import ffmpegPath from "ffmpeg-static";
 import { execFile } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, rename, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { env } from "wasp/server";
 import { buildSandboxSrcDoc } from "../security";
@@ -23,14 +23,19 @@ export async function renderAnimationVideo(input: {
   format: VideoFormat;
   userId: string;
   animationId: string;
+  renderAttemptId: string;
 }): Promise<RenderedVideo> {
   const workDir = await mkdtemp(path.join(tmpdir(), "ai-animation-"));
   const rawWebm = path.join(workDir, "capture.webm");
   const stagedOutput = path.join(workDir, `render.${input.format}`);
   const outputDir = path.join(getVideoStorageRoot(), input.userId);
+  const renderAttemptId = storageSegment(
+    input.renderAttemptId,
+    "render attempt id",
+  );
   const finalPath = path.join(
     outputDir,
-    `${input.animationId}.${input.format}`,
+    `${input.animationId}-${renderAttemptId}.${input.format}`,
   );
   let browser: Awaited<
     ReturnType<(typeof import("playwright"))["chromium"]["launch"]>
@@ -165,9 +170,38 @@ async function withTimeout<T>(
 }
 
 export function getVideoStorageRoot(): string {
-  return path.resolve(
-    env.AI_VIDEO_STORAGE_DIR ??
-      path.join(process.cwd(), "storage", "ai-studio-videos"),
+  return resolveVideoStorageRoot({
+    configuredDir: env.AI_VIDEO_STORAGE_DIR,
+    nodeEnv: process.env.NODE_ENV,
+  });
+}
+
+export function resolveVideoStorageRoot(input: {
+  configuredDir?: string;
+  nodeEnv?: string;
+  homeDir?: string;
+}): string {
+  const configuredDir = input.configuredDir?.trim();
+  const isProduction = input.nodeEnv === "production";
+  if (configuredDir) {
+    if (isProduction && !path.isAbsolute(configuredDir)) {
+      throw new Error(
+        "AI_VIDEO_STORAGE_DIR must be an absolute persistent-volume path in production",
+      );
+    }
+    return path.isAbsolute(configuredDir)
+      ? path.normalize(configuredDir)
+      : path.resolve(input.homeDir ?? homedir(), configuredDir);
+  }
+  if (isProduction) {
+    throw new Error(
+      "AI_VIDEO_STORAGE_DIR must be configured as an absolute persistent-volume path in production",
+    );
+  }
+  return path.join(
+    input.homeDir ?? homedir(),
+    ".motionpress",
+    "ai-studio-videos",
   );
 }
 
@@ -179,4 +213,18 @@ export function isPathInsideVideoStorage(candidate: string): boolean {
   return (
     relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
   );
+}
+
+export async function discardRenderedVideo(storagePath: string): Promise<void> {
+  if (!isPathInsideVideoStorage(storagePath)) {
+    throw new Error("Refusing to remove a video outside managed storage");
+  }
+  await rm(storagePath, { force: true });
+}
+
+function storageSegment(value: string, label: string): string {
+  if (!/^[a-z0-9_-]+$/i.test(value)) {
+    throw new Error(`Invalid ${label}`);
+  }
+  return value;
 }

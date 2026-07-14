@@ -7,6 +7,7 @@ export const getPublishedCmsContentApi: GetPublishedCmsContentApi = async (
   req,
   res,
 ) => {
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
   const requiredToken = env.CMS_CONTENT_API_TOKEN;
   if (
     requiredToken &&

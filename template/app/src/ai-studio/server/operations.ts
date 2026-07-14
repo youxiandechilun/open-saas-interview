@@ -13,8 +13,8 @@ import * as z from "zod";
 import { ensureArgsSchemaOrThrowHttpError } from "../../server/validation";
 import {
   AI_HOURLY_REQUEST_LIMIT,
-  AI_HOURLY_TOKEN_LIMIT,
   AI_MAX_PROMPT_LENGTH,
+  VIDEO_USAGE_RESERVATION_MS,
   isValidIdempotencyKey,
   quotaRemaining,
   startOfUtcHour,
@@ -28,14 +28,27 @@ import {
   type PromptOptimizationView,
   type PromptScore,
 } from "../types";
-import { generateHtmlAnimation, optimizeAnimationPrompt } from "./aiClient";
+import {
+  AiResponseError,
+  generateHtmlAnimation,
+  getGenerateAnimationTokenBudget,
+  getOptimizePromptTokenBudget,
+  optimizeAnimationPrompt,
+} from "./aiClient";
+import {
+  AI_PROVIDER_CONFIG_ID,
+  getAiProviderEnvironment,
+} from "./providerConfig";
+import { resolveAiProviderLimits } from "./providerResolution";
 import {
   completeUsage,
+  expireVideoLease,
   failUsage,
   reserveUsage,
   sharedQuotaOperation,
   type Reservation,
 } from "./usage";
+import { validateSucceededVideoAsset } from "./videoAsset";
 
 const idempotencyKeySchema = z
   .string()
@@ -64,10 +77,12 @@ export const optimizeAiAnimationPrompt: OptimizeAiAnimationPrompt<
 > = async (rawArgs, context) => {
   const userId = requireUserId(context.user);
   const args = ensureArgsSchemaOrThrowHttpError(optimizeInputSchema, rawArgs);
+  const tokenBudget = getOptimizePromptTokenBudget(args.prompt);
   const reservation = await reserveUsage({
     userId,
     operation: "PROMPT_OPTIMIZE",
     idempotencyKey: args.idempotencyKey,
+    ...tokenBudget,
   });
   const replay = replayJsonOrThrow(reservation, promptOptimizationViewSchema);
   if (replay) return replay;
@@ -75,8 +90,13 @@ export const optimizeAiAnimationPrompt: OptimizeAiAnimationPrompt<
 
   const startedAt = Date.now();
   let usageSettled = false;
+  let consumedTokens: ConsumedTokens | undefined;
   try {
-    const result = await optimizeAnimationPrompt(args.prompt);
+    const result = await optimizeAnimationPrompt(
+      args.prompt,
+      reservation.maxCompletionTokens,
+    );
+    consumedTokens = result;
     enforceScoreInvariant(result.value);
     const optimization = {
       ...result.value,
@@ -104,6 +124,7 @@ export const optimizeAiAnimationPrompt: OptimizeAiAnimationPrompt<
         reservedTokens: reservation.reservedTokens,
         errorCode: errorCode(error),
         latencyMs: Date.now() - startedAt,
+        ...failureTokens(error, consumedTokens),
       });
     }
     throw toProviderHttpError(error);
@@ -135,10 +156,14 @@ export const generateAiAnimation: GenerateAiAnimation<
     throw new HttpError(409, "Prompt optimization result is unavailable");
   }
   enforceScoreInvariant(optimization.data);
+  const tokenBudget = getGenerateAnimationTokenBudget(
+    optimization.data.optimizedPrompt,
+  );
   const reservation = await reserveUsage({
     userId,
     operation: "HTML_GENERATE",
     idempotencyKey: args.idempotencyKey,
+    ...tokenBudget,
   });
 
   if (reservation.kind === "existing") {
@@ -157,10 +182,13 @@ export const generateAiAnimation: GenerateAiAnimation<
 
   const startedAt = Date.now();
   let usageSettled = false;
+  let consumedTokens: ConsumedTokens | undefined;
   try {
     const result = await generateHtmlAnimation(
       optimization.data.optimizedPrompt,
+      reservation.maxCompletionTokens,
     );
+    consumedTokens = result;
     const validation = validateAnimationHtml(result.value.html);
     if (!validation.ok) {
       const failedAnimation = await context.entities.AiAnimation.create({
@@ -187,6 +215,8 @@ export const generateAiAnimation: GenerateAiAnimation<
         userId,
         reservedTokens: reservation.reservedTokens,
         errorCode: "UNSAFE_HTML",
+        promptTokens: result.promptTokens,
+        completionTokens: result.completionTokens,
         latencyMs: Date.now() - startedAt,
         animationId: failedAnimation.id,
       });
@@ -233,6 +263,7 @@ export const generateAiAnimation: GenerateAiAnimation<
         reservedTokens: reservation.reservedTokens,
         errorCode: errorCode(error),
         latencyMs: Date.now() - startedAt,
+        ...failureTokens(error, consumedTokens),
       });
     }
     throw toProviderHttpError(error);
@@ -276,11 +307,25 @@ async function queueVideo(input: {
   if (animation.status !== "READY") {
     throw new HttpError(409, "Only ready animations can be rendered");
   }
-  if (input.requireFailed && animation.videoStatus !== "FAILED") {
-    throw new HttpError(409, "Only failed video jobs can be retried");
+  let effectiveVideoStatus = animation.videoStatus;
+  if (animation.videoStatus === "SUCCEEDED") {
+    const replay = await validateSucceededReplay(
+      animation,
+      input.context.entities.AiAnimation,
+    );
+    if (replay.state === "valid") {
+      if (input.requireFailed) {
+        throw new HttpError(409, "Only failed video jobs can be retried");
+      }
+      return toAnimationView(animation);
+    }
+    if (replay.state === "conflict") {
+      throw new HttpError(409, "Video state changed; refresh and retry");
+    }
+    effectiveVideoStatus = "FAILED";
   }
-  if (!input.requireFailed && animation.videoStatus === "SUCCEEDED") {
-    return toAnimationView(animation);
+  if (input.requireFailed && effectiveVideoStatus !== "FAILED") {
+    throw new HttpError(409, "Only failed video jobs can be retried");
   }
 
   const operation = input.requireFailed ? "VIDEO_RETRY" : "VIDEO_RENDER";
@@ -288,12 +333,24 @@ async function queueVideo(input: {
     userId: input.userId,
     operation,
     idempotencyKey: input.idempotencyKey,
+    reservationTtlMs: VIDEO_USAGE_RESERVATION_MS,
   });
   if (reservation.kind === "existing") {
     if (reservation.usage.animationId) {
       const replayed = await input.context.entities.AiAnimation.findFirst({
         where: { id: reservation.usage.animationId, userId: input.userId },
       });
+      if (replayed?.videoStatus === "SUCCEEDED") {
+        const replay = await validateSucceededReplay(
+          replayed,
+          input.context.entities.AiAnimation,
+        );
+        if (replay.state === "valid") return toAnimationView(replayed);
+        throw new HttpError(
+          409,
+          "The stored video output is unavailable; start a new render request",
+        );
+      }
       if (replayed) return toAnimationView(replayed);
     }
     throwExistingReservation(reservation);
@@ -384,69 +441,103 @@ async function queueVideo(input: {
   return toAnimationView(queued);
 }
 
+async function validateSucceededReplay(
+  animation: AiAnimation,
+  animationStore: PrismaClient["aiAnimation"],
+) {
+  return validateSucceededVideoAsset({
+    asset: {
+      id: animation.id,
+      userId: animation.userId,
+      videoStoragePath: animation.videoStoragePath,
+      videoFormat: animation.videoFormat,
+      videoMimeType: animation.videoMimeType,
+    },
+    invalidate: (cas) => animationStore.updateMany(cas),
+  });
+}
+
 export const getAiStudioDashboard: GetAiStudioDashboard<
   void,
   AiStudioDashboard
 > = async (_args, context) => {
   const userId = requireUserId(context.user);
   const windowStart = startOfUtcHour(new Date());
-  await context.entities.AiAnimation.updateMany({
+  const leaseCheckAt = new Date();
+  const expiredLeases = await context.entities.AiAnimation.findMany({
     where: {
       userId,
       videoStatus: "PROCESSING",
-      videoLeaseExpiresAt: { lte: new Date() },
+      videoLeaseExpiresAt: { lte: leaseCheckAt },
     },
-    data: {
-      videoStatus: "FAILED",
-      videoError: "Video worker lease expired; retry is available.",
-      videoUpdatedAt: new Date(),
-      videoLeaseExpiresAt: null,
+    select: {
+      id: true,
+      videoUsageLogId: true,
     },
+    take: 50,
   });
+  for (const expired of expiredLeases) {
+    await expireVideoLease({
+      animationId: expired.id,
+      userId,
+      usageLogId: expired.videoUsageLogId,
+      now: leaseCheckAt,
+    });
+  }
 
-  const [animations, logs, quota, totals] = await prisma.$transaction([
-    context.entities.AiAnimation.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    }),
-    context.entities.AiUsageLog.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 30,
-      select: {
-        id: true,
-        createdAt: true,
-        operation: true,
-        status: true,
-        totalTokens: true,
-        estimatedCostMicros: true,
-        latencyMs: true,
-        errorCode: true,
-      },
-    }),
-    context.entities.AiQuotaWindow.findUnique({
-      where: {
-        userId_operation_windowStart: {
-          userId,
-          operation: sharedQuotaOperation(),
-          windowStart,
+  const [animations, logs, quota, totals, storedLimits] =
+    await prisma.$transaction([
+      context.entities.AiAnimation.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      context.entities.AiUsageLog.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: {
+          id: true,
+          createdAt: true,
+          operation: true,
+          status: true,
+          totalTokens: true,
+          estimatedCostMicros: true,
+          latencyMs: true,
+          errorCode: true,
         },
-      },
-      select: { requestCount: true, inFlight: true, tokenCount: true },
-    }),
-    context.entities.AiUsageLog.aggregate({
-      where: { userId, status: "SUCCEEDED" },
-      _sum: { totalTokens: true, estimatedCostMicros: true },
-    }),
-  ]);
+      }),
+      context.entities.AiQuotaWindow.findUnique({
+        where: {
+          userId_operation_windowStart: {
+            userId,
+            operation: sharedQuotaOperation(),
+            windowStart,
+          },
+        },
+        select: { requestCount: true, inFlight: true, tokenCount: true },
+      }),
+      context.entities.AiUsageLog.aggregate({
+        // Failed provider responses can still consume tokens and incur cost.
+        where: { userId, status: { in: ["SUCCEEDED", "FAILED"] } },
+        _sum: { totalTokens: true, estimatedCostMicros: true },
+      }),
+      context.entities.AiProviderConfig.findUnique({
+        where: { id: AI_PROVIDER_CONFIG_ID },
+        select: { hourlyTokenLimit: true, maxCompletionTokens: true },
+      }),
+    ]);
 
   const usedThisHour = quota?.requestCount ?? 0;
+  const providerLimits = resolveAiProviderLimits({
+    stored: storedLimits,
+    environment: getAiProviderEnvironment(),
+  });
   return {
     animations: animations.map(toAnimationView),
     usage: {
       hourlyLimit: AI_HOURLY_REQUEST_LIMIT,
-      hourlyTokenLimit: AI_HOURLY_TOKEN_LIMIT,
+      hourlyTokenLimit: providerLimits.hourlyTokenLimit,
       usedThisHour,
       tokensUsedThisHour: quota?.tokenCount ?? 0,
       inFlight: quota?.inFlight ?? 0,
@@ -458,8 +549,13 @@ export const getAiStudioDashboard: GetAiStudioDashboard<
   };
 };
 
-function requireUserId(user: { id: string } | undefined): string {
+function requireUserId(
+  user: { id: string; isDisabled?: boolean } | undefined,
+): string {
   if (!user) throw new HttpError(401, "Authentication required");
+  if (user.isDisabled) {
+    throw new HttpError(403, "Disabled accounts cannot use AI operations");
+  }
   return user.id;
 }
 
@@ -526,6 +622,7 @@ function enforceSingleScoreInvariant(score: PromptScore): void {
 }
 
 function errorCode(error: unknown): string {
+  if (error instanceof AiResponseError) return error.errorCode;
   if (error instanceof z.ZodError) return "INVALID_AI_RESPONSE";
   if (error instanceof Error && error.message.includes("score categories")) {
     return "INVALID_AI_SCORE";
@@ -535,13 +632,29 @@ function errorCode(error: unknown): string {
 
 function toProviderHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) return error;
-  if (error instanceof z.ZodError) {
+  if (error instanceof AiResponseError || error instanceof z.ZodError) {
     return new HttpError(
       502,
       "AI provider returned an invalid structured result",
     );
   }
   return new HttpError(502, "AI provider request failed");
+}
+
+type ConsumedTokens = { promptTokens: number; completionTokens: number };
+
+function failureTokens(
+  error: unknown,
+  consumedTokens: ConsumedTokens | undefined,
+): Partial<ConsumedTokens> {
+  if (consumedTokens) return consumedTokens;
+  if (error instanceof AiResponseError) {
+    return {
+      promptTokens: error.promptTokens,
+      completionTokens: error.completionTokens,
+    };
+  }
+  return {};
 }
 
 export function toAnimationView(animation: AiAnimation): AnimationView {

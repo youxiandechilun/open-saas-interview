@@ -1,10 +1,16 @@
 import {
+  AlertTriangle,
   Archive,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  Film,
   FilePlus2,
+  ListTodo,
   Loader2,
   Pencil,
+  RefreshCcw,
   Save,
   Search,
   Trash2,
@@ -14,6 +20,8 @@ import {
   createCmsPost,
   deleteCmsPost,
   getCmsPosts,
+  getCmsPublicationTasks,
+  retryCmsPublicationEvent,
   updateCmsPost,
   useQuery,
 } from "wasp/client/operations";
@@ -31,14 +39,22 @@ import {
 import { Textarea } from "../../client/components/ui/textarea";
 import { toast } from "../../client/hooks/use-toast";
 import { useDebounce } from "../../client/hooks/useDebounce";
+import { type CmsTranslate, useCmsCopy } from "../i18n";
+import { isRetryablePublicationStatus } from "../publicationPolicy";
+import { CMS_PUBLICATION_TASKS_ID } from "../publicationTask";
+import { getCmsPublicMediaDescriptor } from "../publicMedia";
+import { getCmsPublicUrl } from "../publicUrl";
 import {
   CMS_POST_STATUSES,
   type CmsPostListItem,
   type CmsPostStatusValue,
+  type CmsPublicationTaskSummary,
   type CmsPostWriteInput,
   type CmsTaxonomy,
 } from "../types";
 import { getCmsSeoReadinessIssues, normalizeCmsSlug } from "../validation";
+
+const NO_ANIMATION_VALUE = "none";
 
 const EMPTY_POST: CmsPostWriteInput = {
   title: "",
@@ -48,9 +64,11 @@ const EMPTY_POST: CmsPostWriteInput = {
   status: "DRAFT",
   authorId: "",
   tagIds: [],
+  animationId: null,
 };
 
 export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
+  const { formatDate, statusLabel, t } = useCmsCopy();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CmsPostStatusValue | undefined>();
@@ -76,8 +94,7 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
   };
 
   const removePost = async (post: CmsPostListItem) => {
-    if (!window.confirm(`Delete "${post.title}"? This cannot be undone.`))
-      return;
+    if (!window.confirm(t("deletePostConfirm", { title: post.title }))) return;
     try {
       await deleteCmsPost({ id: post.id });
       if (selectedPost?.id === post.id) {
@@ -85,20 +102,21 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
         setIsCreating(false);
       }
       await posts.refetch();
-      toast({ title: "Post deleted" });
+      toast({ title: t("postDeleted") });
     } catch (error) {
-      showError(error);
+      showError(error, t);
     }
   };
 
   return (
     <div className="space-y-5">
+      <PublicationTasksPanel />
       <div className="border-border bg-muted/30 flex flex-col gap-3 border px-4 py-3 lg:flex-row lg:items-center">
         <div className="relative min-w-64 flex-1">
           <Search className="text-muted-foreground absolute left-3 top-2.5 size-4" />
           <Input
-            aria-label="Search posts"
-            placeholder="Search title, slug or excerpt"
+            aria-label={t("searchPosts")}
+            placeholder={t("searchPostsPlaceholder")}
             value={search}
             onChange={(event) => {
               setSearch(event.currentTarget.value);
@@ -108,7 +126,9 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
           />
         </div>
         <FilterSelect
-          label="Status"
+          label={t("status")}
+          ariaLabel={t("statusFilter")}
+          allLabel={t("allStatuses")}
           value={status}
           onChange={(value) => {
             setStatus(value as CmsPostStatusValue | undefined);
@@ -116,11 +136,13 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
           }}
           options={CMS_POST_STATUSES.map((value) => ({
             value,
-            label: formatStatus(value),
+            label: statusLabel(value),
           }))}
         />
         <FilterSelect
-          label="Author"
+          label={t("author")}
+          ariaLabel={t("authorFilter")}
+          allLabel={t("allAuthors")}
           value={authorId}
           onChange={(value) => {
             setAuthorId(value);
@@ -132,7 +154,9 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
           }))}
         />
         <FilterSelect
-          label="Tag"
+          label={t("tag")}
+          ariaLabel={t("tagFilter")}
+          allLabel={t("allTags")}
           value={tagId}
           onChange={(value) => {
             setTagId(value);
@@ -148,30 +172,37 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
           onClick={openNewPost}
           disabled={!taxonomy.authors.length}
         >
-          <FilePlus2 /> New post
+          <FilePlus2 /> {t("newPost")}
         </Button>
       </div>
 
       {!taxonomy.authors.length && (
         <p className="border-warning/50 bg-warning/10 text-foreground border px-4 py-3 text-sm">
-          Add an author before creating a post.
+          {t("authorRequired")}
         </p>
       )}
 
       <div className="grid min-h-[620px] gap-5 xl:grid-cols-[minmax(360px,0.85fr)_minmax(560px,1.5fr)]">
         <section
           className="border-border overflow-hidden border"
-          aria-label="Posts"
+          aria-label={t("posts")}
         >
           <div className="border-border flex h-12 items-center justify-between border-b px-4">
-            <p className="font-medium">{posts.data?.total ?? 0} posts</p>
+            <p className="font-medium">
+              {t(
+                (posts.data?.total ?? 0) === 1
+                  ? "postCountOne"
+                  : "postCountMany",
+                { count: posts.data?.total ?? 0 },
+              )}
+            </p>
             {posts.isLoading && (
               <Loader2 className="text-muted-foreground size-4 animate-spin" />
             )}
           </div>
           {posts.error && (
             <p className="text-destructive p-4 text-sm">
-              {posts.error.message}
+              {t("loadPostsError")}
             </p>
           )}
           <div className="divide-border divide-y">
@@ -193,15 +224,27 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
                     /{post.slug}
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    {post.author.name} |{" "}
-                    {new Date(post.updatedAt).toLocaleDateString()}
+                    {post.author.name} | {formatDate(post.updatedAt)}
                   </p>
+                  {post.animation && (
+                    <p className="text-muted-foreground mt-1 flex items-center gap-1 truncate text-xs">
+                      <Film className="size-3 shrink-0" />
+                      {post.animation.title}
+                    </p>
+                  )}
+                  {post.latestPublicationEvent && (
+                    <div className="mt-2">
+                      <PublicationBadge
+                        status={post.latestPublicationEvent.status}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center">
                   <Button
                     variant="ghost"
                     size="icon"
-                    title="Edit post"
+                    title={t("editPost")}
                     onClick={() => {
                       setSelectedPost(post);
                       setIsCreating(false);
@@ -212,7 +255,7 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    title="Delete post"
+                    title={t("deletePost")}
                     className="text-destructive hover:text-destructive"
                     onClick={() => removePost(post)}
                   >
@@ -223,7 +266,7 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
             ))}
             {!posts.isLoading && posts.data?.items.length === 0 && (
               <p className="text-muted-foreground p-8 text-center text-sm">
-                No posts match these filters.
+                {t("noMatchingPosts")}
               </p>
             )}
           </div>
@@ -232,19 +275,22 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
               <Button
                 variant="ghost"
                 size="icon"
-                title="Previous page"
+                title={t("previousPage")}
                 disabled={page === 1}
                 onClick={() => setPage((value) => Math.max(1, value - 1))}
               >
                 <ChevronLeft />
               </Button>
               <span className="text-muted-foreground text-xs">
-                Page {page} of {posts.data.totalPages}
+                {t("pagination", {
+                  page,
+                  totalPages: posts.data.totalPages,
+                })}
               </span>
               <Button
                 variant="ghost"
                 size="icon"
-                title="Next page"
+                title={t("nextPage")}
                 disabled={page === posts.data.totalPages}
                 onClick={() => setPage((value) => value + 1)}
               >
@@ -254,7 +300,7 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
           )}
         </section>
 
-        <section className="border-border border" aria-label="Post editor">
+        <section className="border-border border" aria-label={t("postEditor")}>
           {selectedPost || isCreating ? (
             <PostEditor
               key={selectedPost?.id ?? "new"}
@@ -273,14 +319,134 @@ export function PostWorkspace({ taxonomy }: { taxonomy: CmsTaxonomy }) {
           ) : (
             <div className="text-muted-foreground flex min-h-[620px] flex-col items-center justify-center gap-3 p-8 text-center">
               <FilePlus2 className="size-8" />
-              <p className="text-sm">
-                Select a post to edit or create a new one.
-              </p>
+              <p className="text-sm">{t("selectPost")}</p>
             </div>
           )}
         </section>
       </div>
     </div>
+  );
+}
+
+function PublicationTasksPanel() {
+  const { formatDateTime, t } = useCmsCopy();
+  const tasks = useQuery(getCmsPublicationTasks, undefined, {
+    refetchInterval: 15_000,
+  });
+  const [retryingEventId, setRetryingEventId] = useState<string | null>(null);
+
+  const retryTask = async (task: CmsPublicationTaskSummary) => {
+    setRetryingEventId(task.eventId);
+    try {
+      await retryCmsPublicationEvent({ id: task.eventId });
+      toast({ title: t("publicationRetryQueued") });
+      await tasks.refetch();
+    } catch (error) {
+      showError(error, t);
+    } finally {
+      setRetryingEventId(null);
+    }
+  };
+
+  return (
+    <section
+      id={CMS_PUBLICATION_TASKS_ID}
+      aria-labelledby="publication-tasks-heading"
+      className="border-border scroll-mt-24 border"
+    >
+      <div className="border-border flex items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <ListTodo className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+          <div>
+            <h2 id="publication-tasks-heading" className="text-sm font-medium">
+              {t("publicationTasks")}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("publicationTasksDescription")}
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          title={t("refreshPublicationTasks")}
+          disabled={tasks.isLoading}
+          onClick={() => tasks.refetch()}
+        >
+          <RefreshCcw
+            className={tasks.isLoading ? "animate-spin" : undefined}
+          />
+        </Button>
+      </div>
+
+      {tasks.error ? (
+        <p className="text-destructive px-4 py-3 text-sm">
+          {t("publicationTasksLoadError")}
+        </p>
+      ) : tasks.isLoading && !tasks.data ? (
+        <div className="text-muted-foreground flex h-20 items-center justify-center">
+          <Loader2 className="size-4 animate-spin" />
+        </div>
+      ) : tasks.data?.length ? (
+        <ul className="divide-border divide-y">
+          {tasks.data.map((task) => {
+            const isRetrying = retryingEventId === task.eventId;
+            return (
+              <li
+                key={task.eventId}
+                className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium">
+                      {task.slug
+                        ? `/${task.slug}`
+                        : t("publicationTaskFallback", {
+                            id: task.postId.slice(0, 8),
+                          })}
+                    </p>
+                    <PublicationBadge status={task.status} />
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {task.eventType} |{" "}
+                    {t("publicationTaskAttempts", { count: task.attempts })} |{" "}
+                    {t("publicationTaskUpdated", {
+                      time: formatDateTime(task.updatedAt),
+                    })}
+                  </p>
+                  {task.lastError && (
+                    <p className="text-muted-foreground mt-1 break-words text-xs">
+                      {task.lastError}
+                    </p>
+                  )}
+                </div>
+                {isRetryablePublicationStatus(task.status) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={retryingEventId !== null}
+                    onClick={() => retryTask(task)}
+                  >
+                    {isRetrying ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <RefreshCcw />
+                    )}
+                    {t("retryPublication")}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground px-4 py-5 text-sm">
+          {t("noPublicationTasks")}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -295,6 +461,12 @@ function PostEditor({
   onSaved: () => Promise<void>;
   onCancel: () => void;
 }) {
+  const {
+    animationVideoStatusLabel,
+    publicationStatusLabel,
+    seoIssueLabel,
+    t,
+  } = useCmsCopy();
   const [form, setForm] = useState<CmsPostWriteInput>(() =>
     post
       ? {
@@ -305,15 +477,39 @@ function PostEditor({
           status: post.status,
           authorId: post.author.id,
           tagIds: post.tags.map(({ id }) => id),
+          animationId: post.animation?.id ?? null,
         }
       : { ...EMPTY_POST, authorId: taxonomy.authors[0]?.id ?? "" },
   );
   const [slugEdited, setSlugEdited] = useState(Boolean(post));
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingStatus, setSavingStatus] = useState<CmsPostStatusValue | null>(
+    null,
+  );
+  const isSaving = savingStatus !== null;
   const normalizedSlug = normalizeCmsSlug(form.slug || form.title);
   const seoIssues = useMemo(
     () => getCmsSeoReadinessIssues({ ...form, slug: normalizedSlug }),
     [form, normalizedSlug],
+  );
+  const seoScore = Math.max(0, 100 - seoIssues.length * 12);
+  const publicUrl = getCmsPublicUrl(
+    import.meta.env.REACT_APP_BLOG_URL,
+    normalizedSlug,
+  );
+  const selectableAnimations = useMemo(() => {
+    if (
+      !post?.animation ||
+      taxonomy.animations.some(({ id }) => id === post.animation?.id)
+    ) {
+      return taxonomy.animations;
+    }
+    return [post.animation, ...taxonomy.animations];
+  }, [post?.animation, taxonomy.animations]);
+  const selectedAnimation = selectableAnimations.find(
+    ({ id }) => id === form.animationId,
+  );
+  const selectedAnimationIsPublishable = Boolean(
+    getCmsPublicMediaDescriptor(selectedAnimation ?? null),
   );
 
   const setField = <Key extends keyof CmsPostWriteInput>(
@@ -321,51 +517,104 @@ function PostEditor({
     value: CmsPostWriteInput[Key],
   ) => setForm((current) => ({ ...current, [key]: value }));
 
-  const save = async () => {
-    setIsSaving(true);
+  const save = async (nextStatus: CmsPostStatusValue) => {
+    if (
+      post?.status === "PUBLISHED" &&
+      nextStatus !== "PUBLISHED" &&
+      !window.confirm(t("unpublishConfirm"))
+    ) {
+      return;
+    }
+    setSavingStatus(nextStatus);
     try {
-      const input = { ...form, slug: normalizedSlug };
+      const input = { ...form, slug: normalizedSlug, status: nextStatus };
       if (post) {
         await updateCmsPost({ id: post.id, ...input });
       } else {
         await createCmsPost(input);
       }
-      toast({ title: post ? "Post updated" : "Post created" });
+      toast({ title: post ? t("postUpdated") : t("postCreated") });
       await onSaved();
     } catch (error) {
-      showError(error);
+      showError(error, t);
     } finally {
-      setIsSaving(false);
+      setSavingStatus(null);
+    }
+  };
+
+  const retryPublication = async () => {
+    if (!post?.latestPublicationEvent) return;
+    try {
+      await retryCmsPublicationEvent({ id: post.latestPublicationEvent.id });
+      toast({ title: t("publicationRetryQueued") });
+      await onSaved();
+    } catch (error) {
+      showError(error, t);
     }
   };
 
   return (
     <div>
       <div className="border-border flex min-h-12 flex-wrap items-center justify-between gap-3 border-b px-4 py-2">
-        <p className="font-medium">{post ? "Edit post" : "New post"}</p>
+        <p className="font-medium">{post ? t("editPost") : t("newPost")}</p>
         <div className="flex gap-2">
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("cancel")}
+          </Button>
+          {post && post.status !== "ARCHIVED" && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => save("ARCHIVED")}
+              disabled={isSaving}
+            >
+              {savingStatus === "ARCHIVED" ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Archive />
+              )}
+              {t("archivePost")}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => save("DRAFT")}
+            disabled={isSaving || !form.title.trim() || !form.authorId}
+          >
+            {savingStatus === "DRAFT" ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Save />
+            )}
+            {post?.status === "PUBLISHED"
+              ? t("unpublishToDraft")
+              : t("saveDraft")}
           </Button>
           <Button
             type="button"
-            onClick={save}
+            onClick={() => save("PUBLISHED")}
             disabled={
               isSaving ||
               !form.title.trim() ||
               !form.authorId ||
-              (form.status === "PUBLISHED" && seoIssues.length > 0)
+              (Boolean(selectedAnimation) && !selectedAnimationIsPublishable) ||
+              seoIssues.length > 0
             }
           >
-            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-            Save
+            {savingStatus === "PUBLISHED" ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <CheckCircle2 />
+            )}
+            {post?.status === "PUBLISHED" ? t("updatePublished") : t("publish")}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-5 p-4 md:grid-cols-2">
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="cms-title">Title</Label>
+          <Label htmlFor="cms-title">{t("title")}</Label>
           <Input
             id="cms-title"
             value={form.title}
@@ -380,11 +629,11 @@ function PostEditor({
             }}
           />
           <p className="text-muted-foreground text-right text-xs">
-            {form.title.length}/65 recommended
+            {t("titleRecommendation", { count: form.title.length })}
           </p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="cms-slug">Slug</Label>
+          <Label htmlFor="cms-slug">{t("slug")}</Label>
           <Input
             id="cms-slug"
             value={form.slug}
@@ -394,15 +643,28 @@ function PostEditor({
             }}
             onBlur={() => setField("slug", normalizedSlug)}
           />
+          {normalizedSlug && (
+            <div className="text-muted-foreground space-y-1 text-xs">
+              <p>{t("canonicalUrl")}</p>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary block break-all hover:underline"
+              >
+                {publicUrl}
+              </a>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="cms-author">Author</Label>
+          <Label htmlFor="cms-author">{t("author")}</Label>
           <Select
             value={form.authorId}
             onValueChange={(value) => setField("authorId", value)}
           >
             <SelectTrigger id="cms-author">
-              <SelectValue placeholder="Select author" />
+              <SelectValue placeholder={t("selectAuthor")} />
             </SelectTrigger>
             <SelectContent>
               {taxonomy.authors.map((author) => (
@@ -414,7 +676,75 @@ function PostEditor({
           </Select>
         </div>
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="cms-excerpt">Search excerpt</Label>
+          <Label htmlFor="cms-animation" className="flex items-center gap-2">
+            <Film className="size-4" /> {t("animationAttachment")}
+          </Label>
+          <Select
+            value={form.animationId ?? NO_ANIMATION_VALUE}
+            onValueChange={(value) =>
+              setField(
+                "animationId",
+                value === NO_ANIMATION_VALUE ? null : value,
+              )
+            }
+          >
+            <SelectTrigger id="cms-animation">
+              <SelectValue placeholder={t("noAnimation")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_ANIMATION_VALUE}>
+                {t("noAnimation")}
+              </SelectItem>
+              {selectableAnimations.map((animation) => (
+                <SelectItem
+                  key={animation.id}
+                  value={animation.id}
+                  disabled={!getCmsPublicMediaDescriptor(animation)}
+                >
+                  {animation.title} ·{" "}
+                  {animation.ownerLabel || t("animationOwnerUnknown")}
+                  {!getCmsPublicMediaDescriptor(animation) &&
+                    ` (${animationVideoStatusLabel(animation.videoStatus)})`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            {t("animationAttachmentHelp")}
+          </p>
+          {selectedAnimation && (
+            <div className="border-border bg-muted/20 border px-3 py-2">
+              <p className="text-xs font-medium">
+                {t("selectedAnimation")}: {selectedAnimation.title}
+              </p>
+              {selectedAnimation.description && (
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {selectedAnimation.description}
+                </p>
+              )}
+              <p className="text-muted-foreground mt-1 text-xs">
+                {t("animationOwner", {
+                  owner:
+                    selectedAnimation.ownerLabel || t("animationOwnerUnknown"),
+                })}
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {t("animationVideoStatus", {
+                  status: animationVideoStatusLabel(
+                    selectedAnimation.videoStatus,
+                  ),
+                })}
+              </p>
+              {!selectedAnimationIsPublishable && (
+                <p className="text-destructive mt-1 text-xs font-medium">
+                  {t("animationNotPublishable")}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="cms-excerpt">{t("searchExcerpt")}</Label>
           <Textarea
             id="cms-excerpt"
             value={form.excerpt}
@@ -423,31 +753,11 @@ function PostEditor({
             onChange={(event) => setField("excerpt", event.currentTarget.value)}
           />
           <p className="text-muted-foreground text-right text-xs">
-            {form.excerpt.length}/160 recommended
+            {t("excerptRecommendation", { count: form.excerpt.length })}
           </p>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="cms-status">Status</Label>
-          <Select
-            value={form.status}
-            onValueChange={(value) =>
-              setField("status", value as CmsPostStatusValue)
-            }
-          >
-            <SelectTrigger id="cms-status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CMS_POST_STATUSES.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {formatStatus(value)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Tags</legend>
+        <fieldset className="space-y-2 md:col-span-2">
+          <legend className="text-sm font-medium">{t("tags")}</legend>
           <div className="border-input flex min-h-9 flex-wrap gap-3 border px-3 py-2">
             {taxonomy.tags.map((tag) => (
               <label key={tag.id} className="flex items-center gap-2 text-sm">
@@ -466,12 +776,14 @@ function PostEditor({
               </label>
             ))}
             {!taxonomy.tags.length && (
-              <span className="text-muted-foreground text-sm">No tags yet</span>
+              <span className="text-muted-foreground text-sm">
+                {t("noTagsYet")}
+              </span>
             )}
           </div>
         </fieldset>
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="cms-content">Article body (Markdown or HTML)</Label>
+          <Label htmlFor="cms-content">{t("articleBody")}</Label>
           <Textarea
             id="cms-content"
             value={form.content}
@@ -481,20 +793,90 @@ function PostEditor({
         </div>
       </div>
 
-      <div className="border-border bg-muted/25 border-t px-4 py-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Archive className="size-4" />
-          <p className="text-sm font-medium">SEO readiness</p>
+      <div className="border-border bg-muted/25 space-y-4 border-t px-4 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {seoIssues.length === 0 ? (
+              <CheckCircle2 className="text-success size-4" />
+            ) : (
+              <AlertTriangle className="text-warning size-4" />
+            )}
+            <div>
+              <p className="text-sm font-medium">{t("seoReadiness")}</p>
+              <p className="text-muted-foreground text-xs">
+                {t("seoScore", { score: seoScore })}
+              </p>
+            </div>
+          </div>
+          {post?.status === "PUBLISHED" && normalizedSlug && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={publicUrl} target="_blank" rel="noreferrer">
+                <ExternalLink /> {t("openPublicPage")}
+              </a>
+            </Button>
+          )}
         </div>
         {seoIssues.length === 0 ? (
-          <p className="text-success text-sm">Ready to publish.</p>
+          <p className="text-success text-sm">{t("readyToPublish")}</p>
         ) : (
-          <ul className="text-muted-foreground space-y-1 text-sm">
-            {seoIssues.map((issue) => (
-              <li key={issue.code}>- {issue.message}</li>
-            ))}
-          </ul>
+          <div>
+            <p className="text-muted-foreground mb-2 text-xs">
+              {t("seoSuggestions")}
+            </p>
+            <ul className="space-y-2 text-sm">
+              {seoIssues.map((issue) => (
+                <li
+                  key={issue.code}
+                  className="border-border bg-background border px-3 py-2"
+                >
+                  <span className="font-medium">{issue.field}</span>
+                  <span className="text-muted-foreground">: </span>
+                  <span className="text-muted-foreground">
+                    {seoIssueLabel(issue.code)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
+        <div className="border-border border-t pt-3">
+          <p className="text-sm font-medium">{t("publicationSync")}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t("publicationDispatchHelp")}
+          </p>
+          {post?.latestPublicationEvent ? (
+            <div className="mt-2 space-y-1 text-sm">
+              <PublicationBadge status={post.latestPublicationEvent.status} />
+              <p className="text-muted-foreground">
+                {publicationStatusLabel(post.latestPublicationEvent.status)} |{" "}
+                {new Date(
+                  post.latestPublicationEvent.updatedAt,
+                ).toLocaleString()}
+              </p>
+              {post.latestPublicationEvent.lastError && (
+                <p className="text-muted-foreground break-words text-xs">
+                  {post.latestPublicationEvent.lastError}
+                </p>
+              )}
+              {isRetryablePublicationStatus(
+                post.latestPublicationEvent.status,
+              ) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryPublication}
+                >
+                  <RefreshCcw /> {t("retryPublication")}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground mt-1 text-sm">
+              {t("noPublicationEvent")}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -502,11 +884,15 @@ function PostEditor({
 
 function FilterSelect({
   label,
+  ariaLabel,
+  allLabel,
   value,
   options,
   onChange,
 }: {
   label: string;
+  ariaLabel: string;
+  allLabel: string;
   value: string | undefined;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string | undefined) => void;
@@ -516,11 +902,11 @@ function FilterSelect({
       value={value ?? "all"}
       onValueChange={(next) => onChange(next === "all" ? undefined : next)}
     >
-      <SelectTrigger className="w-full lg:w-40" aria-label={`${label} filter`}>
+      <SelectTrigger className="w-full lg:w-40" aria-label={ariaLabel}>
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All {label.toLowerCase()}</SelectItem>
+        <SelectItem value="all">{allLabel}</SelectItem>
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
@@ -531,7 +917,27 @@ function FilterSelect({
   );
 }
 
+function PublicationBadge({ status }: { status: string }) {
+  const { publicationStatusLabel } = useCmsCopy();
+  const style =
+    {
+      PENDING: "bg-warning/15 text-warning",
+      PROCESSING: "bg-primary/10 text-primary",
+      PROCESSED: "bg-success/15 text-success",
+      FAILED: "bg-destructive/10 text-destructive",
+      DISABLED: "bg-muted text-muted-foreground",
+    }[status] ?? "bg-muted text-muted-foreground";
+  return (
+    <span
+      className={`inline-flex rounded-sm px-1.5 py-0.5 text-[11px] font-medium ${style}`}
+    >
+      {publicationStatusLabel(status)}
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: CmsPostStatusValue }) {
+  const { statusLabel } = useCmsCopy();
   const styles: Record<CmsPostStatusValue, string> = {
     DRAFT: "bg-muted text-muted-foreground",
     PUBLISHED: "bg-success/15 text-success",
@@ -541,19 +947,19 @@ function StatusBadge({ status }: { status: CmsPostStatusValue }) {
     <span
       className={`rounded-sm px-1.5 py-0.5 text-[11px] font-medium ${styles[status]}`}
     >
-      {formatStatus(status)}
+      {statusLabel(status)}
     </span>
   );
 }
 
-function formatStatus(status: CmsPostStatusValue) {
-  return status[0] + status.slice(1).toLowerCase();
-}
-
-function showError(error: unknown) {
+function showError(error: unknown, t: CmsTranslate) {
+  console.error(error);
   toast({
-    title: "CMS operation failed",
-    description: error instanceof Error ? error.message : "Unexpected error",
+    title: t("operationFailed"),
+    description:
+      error instanceof Error && error.message
+        ? error.message
+        : t("unexpectedError"),
     variant: "destructive",
   });
 }

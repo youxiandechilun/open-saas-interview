@@ -1,7 +1,15 @@
 import type { RenderAiAnimationVideoJob } from "wasp/server/jobs";
-import { VIDEO_MAX_ATTEMPTS } from "../policy";
+import {
+  VIDEO_JOB_LEASE_MS,
+  VIDEO_MAX_ATTEMPTS,
+  VIDEO_USAGE_RESERVATION_MS,
+} from "../policy";
 import { completeUsage, failUsage } from "./usage";
-import { renderAnimationVideo, type VideoFormat } from "./videoRenderer";
+import {
+  discardRenderedVideo,
+  renderAnimationVideo,
+  type VideoFormat,
+} from "./videoRenderer";
 
 type RenderVideoJobInput = {
   animationId: string;
@@ -56,6 +64,7 @@ export const renderAiAnimationVideoJob: RenderAiAnimationVideoJob<
     return;
   }
 
+  const leaseExpiresAt = new Date(Date.now() + VIDEO_JOB_LEASE_MS);
   const claimed = await context.entities.AiAnimation.updateMany({
     where: {
       id: args.animationId,
@@ -76,7 +85,7 @@ export const renderAiAnimationVideoJob: RenderAiAnimationVideoJob<
       videoAttempts: { increment: 1 },
       videoError: null,
       videoUpdatedAt: new Date(),
-      videoLeaseExpiresAt: new Date(Date.now() + 2 * 60_000),
+      videoLeaseExpiresAt: leaseExpiresAt,
     },
   });
   if (claimed.count === 0) {
@@ -108,36 +117,47 @@ export const renderAiAnimationVideoJob: RenderAiAnimationVideoJob<
     throw new Error("Video job could not claim the queued animation");
   }
 
+  const extendedUsage = await context.entities.AiUsageLog.updateMany({
+    where: {
+      id: args.usageLogId,
+      userId: args.userId,
+      status: "STARTED",
+    },
+    data: {
+      expiresAt: new Date(Date.now() + VIDEO_USAGE_RESERVATION_MS),
+    },
+  });
+  if (extendedUsage.count === 0) {
+    await context.entities.AiAnimation.updateMany({
+      where: {
+        id: args.animationId,
+        userId: args.userId,
+        videoStatus: "PROCESSING",
+        videoUsageLogId: args.usageLogId,
+        videoLeaseExpiresAt: leaseExpiresAt,
+      },
+      data: {
+        videoStatus: "FAILED",
+        videoError: "Video usage reservation expired before rendering started.",
+        videoUpdatedAt: new Date(),
+        videoLeaseExpiresAt: null,
+      },
+    });
+    return;
+  }
+
   const active = await context.entities.AiAnimation.findFirstOrThrow({
     where: { id: args.animationId, userId: args.userId },
   });
+  let rendered: Awaited<ReturnType<typeof renderAnimationVideo>>;
   try {
-    const rendered = await renderAnimationVideo({
+    rendered = await renderAnimationVideo({
       html: active.html,
       durationSeconds: active.durationSeconds,
       format: args.format,
       userId: args.userId,
       animationId: args.animationId,
-    });
-    await context.entities.AiAnimation.update({
-      where: { id: args.animationId, userId: args.userId },
-      data: {
-        videoStatus: "SUCCEEDED",
-        videoStoragePath: rendered.storagePath,
-        videoMimeType: rendered.mimeType,
-        videoError: null,
-        videoUpdatedAt: new Date(),
-        videoLeaseExpiresAt: null,
-      },
-    });
-    await completeUsage({
-      usageLogId: args.usageLogId,
-      windowStart,
-      userId: args.userId,
-      reservedTokens: args.reservedTokens,
-      animationId: args.animationId,
-      latencyMs: Date.now() - startedAt,
-      responseJson: { animationId: args.animationId },
+      renderAttemptId: `${args.usageLogId}-${leaseExpiresAt.getTime()}`,
     });
   } catch (error) {
     console.error(
@@ -150,12 +170,16 @@ export const renderAiAnimationVideoJob: RenderAiAnimationVideoJob<
         ? "Video rendering timed out"
         : "Video rendering failed";
     const shouldRetry = active.videoAttempts < VIDEO_MAX_ATTEMPTS;
-    await context.entities.AiAnimation.updateMany({
+    const transitioned = await context.entities.AiAnimation.updateMany({
       where: {
         id: args.animationId,
         userId: args.userId,
         videoStatus: "PROCESSING",
         videoUsageLogId: args.usageLogId,
+        videoLeaseExpiresAt: {
+          equals: leaseExpiresAt,
+          gt: new Date(),
+        },
       },
       data: {
         videoStatus: shouldRetry ? "QUEUED" : "FAILED",
@@ -164,6 +188,18 @@ export const renderAiAnimationVideoJob: RenderAiAnimationVideoJob<
         videoLeaseExpiresAt: null,
       },
     });
+    if (transitioned.count === 0) {
+      await failUsage({
+        usageLogId: args.usageLogId,
+        windowStart,
+        userId: args.userId,
+        reservedTokens: args.reservedTokens,
+        errorCode: "VIDEO_JOB_SUPERSEDED",
+        animationId: args.animationId,
+        latencyMs: Date.now() - startedAt,
+      });
+      return;
+    }
     if (!shouldRetry) {
       await failUsage({
         usageLogId: args.usageLogId,
@@ -174,7 +210,58 @@ export const renderAiAnimationVideoJob: RenderAiAnimationVideoJob<
         animationId: args.animationId,
         latencyMs: Date.now() - startedAt,
       });
+      return;
     }
     throw error;
   }
+
+  const completedAt = new Date();
+  const accepted = await context.entities.AiAnimation.updateMany({
+    where: {
+      id: args.animationId,
+      userId: args.userId,
+      videoStatus: "PROCESSING",
+      videoUsageLogId: args.usageLogId,
+      videoLeaseExpiresAt: {
+        equals: leaseExpiresAt,
+        gt: completedAt,
+      },
+    },
+    data: {
+      videoStatus: "SUCCEEDED",
+      videoStoragePath: rendered.storagePath,
+      videoMimeType: rendered.mimeType,
+      videoError: null,
+      videoUpdatedAt: completedAt,
+      videoLeaseExpiresAt: null,
+    },
+  });
+  if (accepted.count === 0) {
+    await discardRenderedVideo(rendered.storagePath).catch((error) => {
+      console.error(
+        `Could not discard superseded video output for ${args.animationId}`,
+        error,
+      );
+    });
+    await failUsage({
+      usageLogId: args.usageLogId,
+      windowStart,
+      userId: args.userId,
+      reservedTokens: args.reservedTokens,
+      errorCode: "VIDEO_JOB_SUPERSEDED",
+      animationId: args.animationId,
+      latencyMs: Date.now() - startedAt,
+    });
+    return;
+  }
+
+  await completeUsage({
+    usageLogId: args.usageLogId,
+    windowStart,
+    userId: args.userId,
+    reservedTokens: args.reservedTokens,
+    animationId: args.animationId,
+    latencyMs: Date.now() - startedAt,
+    responseJson: { animationId: args.animationId },
+  });
 };

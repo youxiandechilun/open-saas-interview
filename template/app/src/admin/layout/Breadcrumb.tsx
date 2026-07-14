@@ -1,23 +1,35 @@
-import { Link as WaspRouterLink, routes } from "wasp/client/router";
+import { ChevronRight, Home } from "lucide-react";
+import { Link, routes } from "wasp/client/router";
+
 interface BreadcrumbProps {
   pageName: string;
+  homeLabel?: string;
 }
-export function Breadcrumb({ pageName }: BreadcrumbProps) {
-  return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="text-title-md2 text-foreground font-semibold">
-        {pageName}
-      </h2>
 
-      <nav>
-        <ul className="flex items-center gap-1">
+export function Breadcrumb({
+  pageName,
+  homeLabel = "Overview",
+}: BreadcrumbProps) {
+  return (
+    <div className="mb-6 space-y-2">
+      <nav aria-label="Breadcrumb">
+        <ol className="text-muted-foreground flex items-center gap-1.5 text-sm">
           <li>
-            <WaspRouterLink to={routes.AdminRoute.to}>Dashboard</WaspRouterLink>
+            <Link
+              to={routes.AdminRoute.to}
+              className="hover:text-foreground focus-visible:ring-primary inline-flex items-center gap-1 rounded-sm focus-visible:outline-none focus-visible:ring-2"
+            >
+              <Home className="h-3.5 w-3.5" aria-hidden="true" />
+              {homeLabel}
+            </Link>
           </li>
-          <li>/</li>
-          <li className="font-medium">{pageName}</li>
-        </ul>
+          <li aria-hidden="true">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </li>
+          <li aria-current="page">{pageName}</li>
+        </ol>
       </nav>
+      <h1 className="text-foreground text-2xl font-bold">{pageName}</h1>
     </div>
   );
 }

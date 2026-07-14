@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "astro": "astro",
-    "prebuild": "npm run cms:sync && npm run seo:publish",
+    "prebuild": "node scripts/build-config.mjs && npm run cms:sync && npm run seo:publish",
     "build": "astro check && astro build && node scripts/assert-build.mjs",
+    "brand-assets:sync": "node scripts/sync-brand-assets.mjs",
     "cms:sync": "node scripts/cms-sync.mjs",
     "content:publish": "node scripts/production-config.mjs && npm run build",
     "dev": "astro dev",
@@ -13,7 +14,7 @@
     "seo:check": "node scripts/seo-pipeline.mjs",
     "seo:publish": "node scripts/seo-pipeline.mjs --write",
     "start": "astro dev",
-    "test": "node --test test/blog-seo.test.mjs test/seo-quality.test.mjs test/cms-sync.test.mjs test/production-config.test.mjs",
+    "test": "node --test test/blog-seo.test.mjs test/seo-quality.test.mjs test/cms-sync.test.mjs test/production-config.test.mjs test/content-qa.test.mjs test/markdown-security.test.mjs",
     "test:build": "node scripts/assert-build.mjs"
   },
   "dependencies": {
@@ -22,6 +23,8 @@
     "@astrojs/starlight-tailwind": "^2.0.3",
     "@astrojs/tailwind": "^5.1.2",
     "astro": "^4.16.15",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
     "sharp": "^0.32.5",
     "starlight-blog": "^0.15.0",
     "typescript": "^5.4.5"

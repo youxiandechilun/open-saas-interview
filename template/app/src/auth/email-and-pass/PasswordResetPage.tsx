@@ -1,16 +1,23 @@
 import { ResetPasswordForm } from "wasp/client/auth";
 import { Link as WaspRouterLink, routes } from "wasp/client/router";
+import { useI18n } from "../../i18n";
 import { AuthPageLayout } from "../AuthPageLayout";
 
 export function PasswordResetPage() {
+  const { t } = useI18n();
+
   return (
-    <AuthPageLayout>
+    <AuthPageLayout
+      title={t("auth.reset.password.title")}
+      description={t("auth.reset.password.description")}
+    >
       <ResetPasswordForm />
-      <br />
-      <span className="text-sm font-medium text-gray-900">
-        If everything is okay,{" "}
-        <WaspRouterLink to={routes.LoginRoute.to}>go to login</WaspRouterLink>
-      </span>
+      <WaspRouterLink
+        to={routes.LoginRoute.to}
+        className="text-primary mt-5 inline-block text-sm font-medium underline"
+      >
+        {t("auth.flow.returnLogin")}
+      </WaspRouterLink>
     </AuthPageLayout>
   );
 }

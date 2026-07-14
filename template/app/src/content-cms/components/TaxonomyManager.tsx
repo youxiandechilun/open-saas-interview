@@ -21,6 +21,7 @@ import { Input } from "../../client/components/ui/input";
 import { Label } from "../../client/components/ui/label";
 import { Textarea } from "../../client/components/ui/textarea";
 import { toast } from "../../client/hooks/use-toast";
+import { type CmsTranslate, useCmsCopy } from "../i18n";
 import {
   type CmsAuthorSummary,
   type CmsTagSummary,
@@ -39,12 +40,19 @@ export function TaxonomyManager({
   taxonomy: CmsTaxonomy;
   onChanged: () => Promise<unknown>;
 }) {
+  const { t } = useCmsCopy();
   const [editing, setEditing] = useState<EditableTaxonomy | "new" | null>(null);
   const items = taxonomy[kind];
-  const singular = kind === "authors" ? "author" : "tag";
 
   const remove = async (item: EditableTaxonomy) => {
-    if (!window.confirm(`Delete ${singular} "${item.name}"?`)) return;
+    if (
+      !window.confirm(
+        t(kind === "authors" ? "deleteAuthorConfirm" : "deleteTagConfirm", {
+          name: item.name,
+        }),
+      )
+    )
+      return;
     try {
       if (kind === "authors") {
         await deleteCmsAuthor({ id: item.id });
@@ -52,18 +60,22 @@ export function TaxonomyManager({
         await deleteCmsTag({ id: item.id });
       }
       await onChanged();
-      toast({ title: `${capitalize(singular)} deleted` });
+      toast({
+        title: t(kind === "authors" ? "authorDeleted" : "tagDeleted"),
+      });
     } catch (error) {
-      showError(error);
+      showError(error, t);
     }
   };
 
   return (
     <section className="border-border border">
       <div className="border-border flex items-center justify-between border-b px-5 py-4">
-        <h3 className="font-semibold">{capitalize(kind)}</h3>
+        <h3 className="font-semibold">
+          {t(kind === "authors" ? "authors" : "tags")}
+        </h3>
         <Button type="button" onClick={() => setEditing("new")}>
-          <Plus /> Add {singular}
+          <Plus /> {t(kind === "authors" ? "addAuthor" : "addTag")}
         </Button>
       </div>
 
@@ -84,14 +96,16 @@ export function TaxonomyManager({
                 </p>
               )}
               <p className="text-muted-foreground mt-1 text-xs">
-                {item.postCount} {item.postCount === 1 ? "post" : "posts"}
+                {t(item.postCount === 1 ? "postCountOne" : "postCountMany", {
+                  count: item.postCount,
+                })}
               </p>
             </div>
             <div className="flex gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                title={`Edit ${singular}`}
+                title={t(kind === "authors" ? "editAuthor" : "editTag")}
                 onClick={() => setEditing(item)}
               >
                 <Pencil />
@@ -101,8 +115,8 @@ export function TaxonomyManager({
                 size="icon"
                 title={
                   kind === "authors" && item.postCount > 0
-                    ? "Reassign posts before deleting this author"
-                    : `Delete ${singular}`
+                    ? t("reassignAuthorBeforeDelete")
+                    : t(kind === "authors" ? "deleteAuthor" : "deleteTag")
                 }
                 className="text-destructive hover:text-destructive"
                 disabled={kind === "authors" && item.postCount > 0}
@@ -115,7 +129,7 @@ export function TaxonomyManager({
         ))}
         {items.length === 0 && (
           <p className="text-muted-foreground p-10 text-center text-sm">
-            No {kind} yet.
+            {t(kind === "authors" ? "noAuthorsYet" : "noTagsYet")}
           </p>
         )}
       </div>
@@ -145,6 +159,7 @@ function TaxonomyDialog({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const { t } = useCmsCopy();
   const existing = item && item !== "new" ? item : null;
   const [name, setName] = useState(existing?.name ?? "");
   const [slug, setSlug] = useState(existing?.slug ?? "");
@@ -155,7 +170,6 @@ function TaxonomyDialog({
   );
   const [slugEdited, setSlugEdited] = useState(Boolean(existing));
   const [isSaving, setIsSaving] = useState(false);
-  const singular = kind === "authors" ? "author" : "tag";
 
   const save = async () => {
     setIsSaving(true);
@@ -172,10 +186,12 @@ function TaxonomyDialog({
       } else {
         await createCmsTag(input);
       }
-      toast({ title: `${capitalize(singular)} saved` });
+      toast({
+        title: t(kind === "authors" ? "authorSaved" : "tagSaved"),
+      });
       await onSaved();
     } catch (error) {
-      showError(error);
+      showError(error, t);
     } finally {
       setIsSaving(false);
     }
@@ -186,15 +202,23 @@ function TaxonomyDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {existing ? "Edit" : "Add"} {singular}
+            {t(
+              kind === "authors"
+                ? existing
+                  ? "editAuthorHeading"
+                  : "addAuthorHeading"
+                : existing
+                  ? "editTagHeading"
+                  : "addTagHeading",
+            )}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Slugs become stable public identifiers and must be unique.
+            {t("taxonomySlugDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="taxonomy-name">Name</Label>
+            <Label htmlFor="taxonomy-name">{t("name")}</Label>
             <Input
               id="taxonomy-name"
               value={name}
@@ -207,7 +231,7 @@ function TaxonomyDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="taxonomy-slug">Slug</Label>
+            <Label htmlFor="taxonomy-slug">{t("slug")}</Label>
             <Input
               id="taxonomy-slug"
               value={slug}
@@ -220,7 +244,7 @@ function TaxonomyDialog({
           </div>
           {kind === "authors" && (
             <div className="space-y-2">
-              <Label htmlFor="author-bio">Bio</Label>
+              <Label htmlFor="author-bio">{t("bio")}</Label>
               <Textarea
                 id="author-bio"
                 value={bio}
@@ -233,7 +257,7 @@ function TaxonomyDialog({
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             type="button"
@@ -241,7 +265,7 @@ function TaxonomyDialog({
             disabled={isSaving || !name.trim()}
           >
             {isSaving && <Loader2 className="animate-spin" />}
-            Save
+            {t("save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -249,14 +273,11 @@ function TaxonomyDialog({
   );
 }
 
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function showError(error: unknown) {
+function showError(error: unknown, t: CmsTranslate) {
+  console.error(error);
   toast({
-    title: "CMS operation failed",
-    description: error instanceof Error ? error.message : "Unexpected error",
+    title: t("operationFailed"),
+    description: t("unexpectedError"),
     variant: "destructive",
   });
 }

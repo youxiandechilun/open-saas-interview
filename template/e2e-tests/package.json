@@ -9,12 +9,9 @@
     "test": "tests"
   },
   "scripts": {
-    "_comment-on-local:e2e:cleanup-stripe": "NOTE: because we are running the stripe webhook listener in the background, we want to make sure we kill the previous processes before starting a new one.",
-    "e2e:playwright": "DEBUG=pw:webserver npx playwright test",
-    "local:e2e:cleanup-stripe": "PID=$(ps -ef | grep 'stripe listen' | grep -v grep | awk '{print $2}') || true && kill -9 $PID || true",
-    "local:e2e:playwright:ui": "SKIP_EMAIL_VERIFICATION_IN_DEV=true npx playwright test --ui",
-    "local:e2e:start": "npm run local:e2e:cleanup-stripe && npm run local:e2e:start-stripe && npm run local:e2e:playwright:ui && npm run local:e2e:cleanup-stripe",
-    "local:e2e:start-stripe": "stripe listen --forward-to localhost:3001/payments-webhook &"
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@prisma/client": "5.19.1",
